@@ -53,10 +53,10 @@ enum class AppDestinations(
     val label: String,
     val icon: Int,
 ) {
-    MAP("Map", R.drawable.ic_home),
-    CHATS("Chats", R.drawable.ic_home),
-    NOTIFICATIONS("Notifications", R.drawable.ic_home),
-    PROFILE("Profile", R.drawable.ic_account_box),
+    MAP("Map", R.drawable.ic_map),
+    CHATS("Chats", R.drawable.ic_chats),
+    NOTIFICATIONS("Notifications", R.drawable.ic_notifications),
+    PROFILE("Profile", R.drawable.ic_profile),
 }
 
 @Composable
