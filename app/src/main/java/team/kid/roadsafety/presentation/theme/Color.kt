@@ -1,4 +1,4 @@
-package team.kid.roadsafety.ui.theme
+package team.kid.roadsafety.presentation.theme
 
 import androidx.compose.ui.graphics.Color
 

@@ -1,9 +1,5 @@
-package team.kid.roadsafety
+package team.kid.roadsafety.presentation
 
-import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
@@ -17,27 +13,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewScreenSizes
-import team.kid.roadsafety.ui.theme.RoadSafetyTheme
-
-class MainActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        setContent {
-            RoadSafetyTheme {
-                RoadSafetyApp()
-            }
-        }
-    }
-}
+import team.kid.roadsafety.R
+import team.kid.roadsafety.presentation.theme.RoadSafetyTheme
 
 @PreviewScreenSizes
 @Composable
 fun RoadSafetyApp() {
-    var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.HOME) }
+    var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.PROFILE) }
 
     NavigationSuiteScaffold(
         navigationSuiteItems = {
@@ -69,8 +53,9 @@ enum class AppDestinations(
     val label: String,
     val icon: Int,
 ) {
-    HOME("Home", R.drawable.ic_home),
-    FAVORITES("Favorites", R.drawable.ic_favorite),
+    MAP("Map", R.drawable.ic_home),
+    CHATS("Chats", R.drawable.ic_home),
+    NOTIFICATIONS("Notifications", R.drawable.ic_home),
     PROFILE("Profile", R.drawable.ic_account_box),
 }
 
