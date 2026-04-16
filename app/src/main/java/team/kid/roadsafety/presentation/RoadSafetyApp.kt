@@ -14,13 +14,23 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.tooling.preview.PreviewScreenSizes
 import team.kid.roadsafety.R
+import team.kid.roadsafety.presentation.auth.AuthNavigation
 import team.kid.roadsafety.presentation.theme.RoadSafetyTheme
 
-@PreviewScreenSizes
 @Composable
 fun RoadSafetyApp() {
+    var isAuthenticated by rememberSaveable { mutableStateOf(false) }
+
+    if (!isAuthenticated) {
+        AuthNavigation(onAuthSuccess = { isAuthenticated = true })
+    } else {
+        MainScreen()
+    }
+}
+
+@Composable
+fun MainScreen() {
     var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.PROFILE) }
 
     NavigationSuiteScaffold(
@@ -42,7 +52,7 @@ fun RoadSafetyApp() {
     ) {
         Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
             Greeting(
-                name = "Android",
+                name = currentDestination.label,
                 modifier = Modifier.padding(innerPadding)
             )
         }
