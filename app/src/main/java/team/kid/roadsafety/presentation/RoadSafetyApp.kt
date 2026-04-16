@@ -19,6 +19,7 @@ import team.kid.roadsafety.presentation.auth.AuthNavigation
 import team.kid.roadsafety.presentation.theme.RoadSafetyTheme
 
 @Composable
+@Preview
 fun RoadSafetyApp() {
     var isAuthenticated by rememberSaveable { mutableStateOf(false) }
 

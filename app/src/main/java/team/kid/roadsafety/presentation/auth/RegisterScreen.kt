@@ -27,7 +27,7 @@ import team.kid.roadsafety.presentation.theme.TextGrey
 
 @Composable
 fun RegisterScreen(
-    onBackToLogin: () -> Unit,
+    onLoginClick: () -> Unit,
     onRegisterSuccess: () -> Unit,
     viewModel: RegisterViewModel = viewModel()
 ) {
@@ -132,7 +132,7 @@ fun RegisterScreen(
             fontSize = 14.sp,
             modifier = Modifier
                 .padding(top = 16.dp)
-                .clickable { onBackToLogin() }
+                .clickable { onLoginClick() }
         )
     }
 }
