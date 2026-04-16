@@ -1,10 +1,10 @@
 package team.kid.roadsafety.domain.valueObjects
 
-import androidx.compose.ui.text.intl.Locale
+import java.time.LocalDate
 
 data class UserProfile(
     var firstName: String?,
     var lastName: String?,
     var patronymic: String?,
-    var birthdate: Locale?
+    var birthdate: LocalDate?
 )
