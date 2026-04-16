@@ -27,6 +27,7 @@ import team.kid.roadsafety.data.local.SessionManager
 import team.kid.roadsafety.presentation.theme.RoadSafetyTheme
 
 @Composable
+@Preview
 fun RoadSafetyApp() {
     val context = LocalContext.current
     val sessionManager = remember { SessionManager(context) }

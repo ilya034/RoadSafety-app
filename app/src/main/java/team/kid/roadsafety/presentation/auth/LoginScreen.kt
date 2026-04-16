@@ -67,9 +67,9 @@ fun LoginScreen(
         )
 
         Text(
-            text = "Ещё нет аккаунта? Зарегистрироваться",
+            text = "  Ещё нет аккаунта?\nЗарегистрироваться",
             color = Color.Gray,
-            fontSize = 16.sp,
+            fontSize = 14.sp,
             fontWeight = FontWeight.Medium,
             modifier = Modifier.clickable { onRegisterClick() }
         )
