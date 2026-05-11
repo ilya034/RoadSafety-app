@@ -14,8 +14,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
+import org.maplibre.compose.camera.rememberCameraState
+import org.maplibre.compose.map.MaplibreMap
+import org.maplibre.compose.style.BaseStyle
 import team.kid.roadsafety.R
 import team.kid.roadsafety.presentation.auth.AuthNavigation
+import team.kid.roadsafety.presentation.map.MapColoringScreen
 import team.kid.roadsafety.presentation.theme.RoadSafetyTheme
 
 @Composable
@@ -32,7 +36,7 @@ fun RoadSafetyApp() {
 
 @Composable
 fun MainScreen() {
-    var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.PROFILE) }
+    var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.MAP) }
 
     NavigationSuiteScaffold(
         navigationSuiteItems = {
@@ -52,12 +56,27 @@ fun MainScreen() {
         }
     ) {
         Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-            Greeting(
-                name = currentDestination.label,
-                modifier = Modifier.padding(innerPadding)
-            )
+            when (currentDestination) {
+                AppDestinations.MAP -> MapColoringScreen(modifier = Modifier.padding(innerPadding))
+                else -> {
+                    Greeting(
+                        name = currentDestination.label,
+                        modifier = Modifier.padding(innerPadding)
+                    )
+                }
+            }
         }
     }
+}
+
+@Composable
+fun MapScreen(modifier: Modifier = Modifier) {
+    val cameraState = rememberCameraState()
+    MaplibreMap(
+        modifier = modifier.fillMaxSize(),
+        baseStyle = BaseStyle.Uri("https://demotiles.maplibre.org/style.json"),
+        cameraState = cameraState
+    )
 }
 
 enum class AppDestinations(
