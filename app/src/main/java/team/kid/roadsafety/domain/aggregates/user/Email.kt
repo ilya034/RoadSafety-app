@@ -1,4 +1,6 @@
-package team.kid.roadsafety.domain.valueObjects
+package team.kid.roadsafety.domain.aggregates.user
+
+import android.util.Patterns
 
 @JvmInline
 value class Email private constructor(val value: String) {
@@ -9,7 +11,7 @@ value class Email private constructor(val value: String) {
         }
 
         fun isValid(email: String): Boolean {
-            return android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()
+            return Patterns.EMAIL_ADDRESS.matcher(email).matches()
         }
     }
 }

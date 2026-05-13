@@ -1,8 +1,7 @@
-package team.kid.roadsafety.domain.aggregates
+package team.kid.roadsafety.domain.aggregates.family
 
-import team.kid.roadsafety.domain.entities.FamilyMember
-import team.kid.roadsafety.domain.valueObjects.FamilyId
-import team.kid.roadsafety.domain.valueObjects.UserId
+import team.kid.roadsafety.domain.FamilyId
+import team.kid.roadsafety.domain.UserId
 
 class Family (
     val id: FamilyId,

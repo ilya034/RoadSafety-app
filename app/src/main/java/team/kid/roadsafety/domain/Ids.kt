@@ -1,4 +1,4 @@
-package team.kid.roadsafety.domain.valueObjects
+package team.kid.roadsafety.domain
 
 import java.util.UUID
 

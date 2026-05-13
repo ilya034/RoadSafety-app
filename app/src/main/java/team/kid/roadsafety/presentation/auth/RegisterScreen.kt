@@ -20,7 +20,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import team.kid.roadsafety.domain.enums.FamilyRole
+import team.kid.roadsafety.domain.aggregates.family.FamilyRole
 import team.kid.roadsafety.presentation.theme.RolePurple
 import team.kid.roadsafety.presentation.theme.RoleRed
 import team.kid.roadsafety.presentation.theme.TextGrey

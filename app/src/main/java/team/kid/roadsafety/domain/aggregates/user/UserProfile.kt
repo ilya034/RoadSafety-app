@@ -1,4 +1,4 @@
-package team.kid.roadsafety.domain.valueObjects
+package team.kid.roadsafety.domain.aggregates.user
 
 import java.time.LocalDate
 
