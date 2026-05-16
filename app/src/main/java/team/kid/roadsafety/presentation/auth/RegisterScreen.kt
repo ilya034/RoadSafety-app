@@ -1,9 +1,7 @@
 package team.kid.roadsafety.presentation.auth
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
@@ -11,6 +9,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -19,19 +20,17 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import team.kid.roadsafety.domain.aggregates.family.FamilyRole
-import team.kid.roadsafety.presentation.theme.RolePurple
-import team.kid.roadsafety.presentation.theme.RoleRed
+import androidx.hilt.navigation.compose.hiltViewModel
 import team.kid.roadsafety.presentation.theme.TextGrey
 
 @Composable
 fun RegisterScreen(
     onLoginClick: () -> Unit,
     onRegisterSuccess: () -> Unit,
-    viewModel: RegisterViewModel = viewModel()
+    viewModel: RegisterViewModel = hiltViewModel()
 ) {
-    val state by viewModel.state.collectAsState()
+    val state by viewModel.uiState.collectAsState()
+    var isAgreed by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -64,54 +63,46 @@ fun RegisterScreen(
             modifier = Modifier.padding(bottom = 12.dp)
         )
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 24.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = "Роль:",
-                color = Color.Gray,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .background(Color.Gray.copy(alpha = 0.5f), RoundedCornerShape(15.dp))
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-            )
+        AuthTextField(
+            value = state.firstName,
+            onValueChange = viewModel::onFirstNameChanged,
+            placeholder = "Имя",
+            modifier = Modifier.padding(bottom = 12.dp)
+        )
 
-            RoleButton(
-                text = "Родитель",
-                isSelected = state.role == FamilyRole.PARENT,
-                color = RoleRed,
-                onClick = { viewModel.onRoleChanged(FamilyRole.PARENT) }
-            )
-
-            RoleButton(
-                text = "Ребенок",
-                isSelected = state.role == FamilyRole.CHILD,
-                color = RolePurple,
-                onClick = { viewModel.onRoleChanged(FamilyRole.CHILD) }
-            )
-        }
+        AuthTextField(
+            value = state.lastName,
+            onValueChange = viewModel::onLastNameChanged,
+            placeholder = "Фамилия",
+            modifier = Modifier.padding(bottom = 24.dp)
+        )
 
         AuthButton(
             text = "Зарегистрироваться",
+            isLoading = state.isLoading,
+            enabled = isAgreed && state.login.isNotBlank() && state.password.length >= 8,
             onClick = {
-                viewModel.onRegisterClicked()
-                onRegisterSuccess()
+                viewModel.register(onSuccess = onRegisterSuccess)
             },
             modifier = Modifier.padding(bottom = 20.dp)
         )
+
+        if (state.error != null) {
+            Text(
+                text = state.error!!,
+                color = Color.Red,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+        }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Top
         ) {
             Checkbox(
-                checked = state.isAgreed,
-                onCheckedChange = viewModel::onAgreementChanged,
+                checked = isAgreed,
+                onCheckedChange = { isAgreed = it },
                 colors = CheckboxDefaults.colors(
                     checkedColor = Color.Gray,
                     uncheckedColor = Color.Gray
@@ -133,32 +124,6 @@ fun RegisterScreen(
             modifier = Modifier
                 .padding(top = 16.dp)
                 .clickable { onLoginClick() }
-        )
-    }
-}
-
-@Composable
-fun RoleButton(
-    text: String,
-    isSelected: Boolean,
-    color: Color,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .background(
-                if (isSelected) color else color.copy(alpha = 0.3f),
-                RoundedCornerShape(15.dp)
-            )
-            .clickable { onClick() }
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = text,
-            color = Color.White,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold
         )
     }
 }

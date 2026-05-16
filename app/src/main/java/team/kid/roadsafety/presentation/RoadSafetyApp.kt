@@ -1,42 +1,53 @@
 package team.kid.roadsafety.presentation
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
-import org.maplibre.compose.camera.rememberCameraState
-import org.maplibre.compose.map.MaplibreMap
-import org.maplibre.compose.style.BaseStyle
+import androidx.hilt.navigation.compose.hiltViewModel
 import team.kid.roadsafety.R
 import team.kid.roadsafety.presentation.auth.AuthNavigation
 import team.kid.roadsafety.presentation.map.MapColoringScreen
 import team.kid.roadsafety.presentation.theme.RoadSafetyTheme
 
 @Composable
-@Preview
-fun RoadSafetyApp() {
-    var isAuthenticated by rememberSaveable { mutableStateOf(false) }
+fun RoadSafetyApp(viewModel: MainViewModel = hiltViewModel()) {
+    val authState by viewModel.authState.collectAsState()
 
-    if (!isAuthenticated) {
-        AuthNavigation(onAuthSuccess = { isAuthenticated = true })
-    } else {
-        MainScreen()
+    when (authState) {
+        is AuthState.Loading -> {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        }
+        is AuthState.Authenticated -> {
+            MainScreen(onLogout = viewModel::logout)
+        }
+        is AuthState.Unauthenticated -> {
+            AuthNavigation(onAuthSuccess = viewModel::onAuthSuccess)
+        }
     }
 }
 
 @Composable
-fun MainScreen() {
-    var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.MAP) }
+fun MainScreen(onLogout: () -> Unit) {
+    var currentDestination by remember { 
+        mutableStateOf(AppDestinations.MAP)
+    }
 
     NavigationSuiteScaffold(
         navigationSuiteItems = {
@@ -58,6 +69,12 @@ fun MainScreen() {
         Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
             when (currentDestination) {
                 AppDestinations.MAP -> MapColoringScreen(modifier = Modifier.padding(innerPadding))
+                AppDestinations.PROFILE -> {
+                    ProfileScreen(
+                        onLogout = onLogout,
+                        modifier = Modifier.padding(innerPadding)
+                    )
+                }
                 else -> {
                     Greeting(
                         name = currentDestination.label,
@@ -70,13 +87,12 @@ fun MainScreen() {
 }
 
 @Composable
-fun MapScreen(modifier: Modifier = Modifier) {
-    val cameraState = rememberCameraState()
-    MaplibreMap(
-        modifier = modifier.fillMaxSize(),
-        baseStyle = BaseStyle.Uri("https://demotiles.maplibre.org/style.json"),
-        cameraState = cameraState
-    )
+fun ProfileScreen(onLogout: () -> Unit, modifier: Modifier = Modifier) {
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        androidx.compose.material3.Button(onClick = onLogout) {
+            Text("Logout")
+        }
+    }
 }
 
 enum class AppDestinations(
@@ -95,12 +111,4 @@ fun Greeting(name: String, modifier: Modifier = Modifier) {
         text = "Hello $name!",
         modifier = modifier
     )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    RoadSafetyTheme {
-        Greeting("Android")
-    }
 }
