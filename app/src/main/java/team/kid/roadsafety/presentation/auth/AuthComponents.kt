@@ -6,11 +6,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -68,15 +70,19 @@ fun AuthTextField(
 fun AuthButton(
     text: String,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isLoading: Boolean = false,
+    enabled: Boolean = true
 ) {
     Button(
         onClick = onClick,
+        enabled = enabled && !isLoading,
         modifier = modifier
             .fillMaxWidth(0.6f)
             .height(50.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = Color.Transparent
+            containerColor = Color.Transparent,
+            disabledContainerColor = Color.Transparent
         ),
         shape = RoundedCornerShape(25.dp),
         contentPadding = androidx.compose.foundation.layout.PaddingValues()
@@ -87,19 +93,27 @@ fun AuthButton(
                 .background(
                     brush = Brush.verticalGradient(
                         colors = listOf(
-                            ButtonGreen,
-                            ButtonGreen.copy(alpha = 0.7f)
+                            if (enabled && !isLoading) ButtonGreen else Color.LightGray,
+                            if (enabled && !isLoading) ButtonGreen.copy(alpha = 0.7f) else Color.Gray
                         )
                     )
                 ),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = text,
-                color = Color.White,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
-            )
+            if (isLoading) {
+                CircularProgressIndicator(
+                    color = Color.White,
+                    modifier = Modifier.size(24.dp),
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Text(
+                    text = text,
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
     }
 }

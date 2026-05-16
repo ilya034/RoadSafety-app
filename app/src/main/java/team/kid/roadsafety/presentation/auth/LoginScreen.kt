@@ -15,15 +15,15 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 
 @Composable
 fun LoginScreen(
     onRegisterClick: () -> Unit,
     onLoginSuccess: () -> Unit,
-    viewModel: LoginViewModel = viewModel()
+    viewModel: LoginViewModel = hiltViewModel()
 ) {
-    val state by viewModel.state.collectAsState()
+    val state by viewModel.uiState.collectAsState()
 
     Column(
         modifier = Modifier
@@ -58,13 +58,20 @@ fun LoginScreen(
 
         AuthButton(
             text = "Войти",
+            isLoading = state.isLoading,
             onClick = {
-                viewModel.onLoginClicked()
-                // For now, let's just trigger success to see navigation
-                onLoginSuccess()
+                viewModel.login(onSuccess = onLoginSuccess)
             },
             modifier = Modifier.padding(bottom = 24.dp)
         )
+
+        if (state.error != null) {
+            Text(
+                text = state.error!!,
+                color = Color.Red,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+        }
 
         Text(
             text = "  Ещё нет аккаунта?\nЗарегистрироваться",
