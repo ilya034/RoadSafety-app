@@ -8,12 +8,15 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import team.kid.roadsafety.domain.aggregates.user.AuthRepository
+import team.kid.roadsafety.domain.aggregates.family.FamilyRepository
+import team.kid.roadsafety.domain.aggregates.user.UserRole
 import java.time.LocalDate
 import javax.inject.Inject
 
 @HiltViewModel
 class RegisterViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val familyRepository: FamilyRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(RegisterUiState())
@@ -39,10 +42,18 @@ class RegisterViewModel @Inject constructor(
         _uiState.update { it.copy(birthDate = birthDate) }
     }
 
+    fun onRoleChanged(role: UserRole) {
+        _uiState.update { it.copy(selectedRole = role) }
+    }
+
     fun register(onSuccess: () -> Unit) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             val state = _uiState.value
+            
+            // Save the role before registration
+            familyRepository.setSelectedRole(state.selectedRole)
+            
             val result = authRepository.register(
                 login = state.login,
                 password = state.password,
@@ -69,6 +80,7 @@ data class RegisterUiState(
     val firstName: String = "",
     val lastName: String = "",
     val birthDate: LocalDate? = null,
+    val selectedRole: UserRole = UserRole.PARENT,
     val isLoading: Boolean = false,
     val error: String? = null
 )

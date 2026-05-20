@@ -12,4 +12,7 @@ value class FamilyId(val value: UUID)
 value class AreaId(val value: UUID)
 
 @JvmInline
+value class CityId(val value: String)
+
+@JvmInline
 value class SessionId(val value: UUID)

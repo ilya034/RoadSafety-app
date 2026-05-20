@@ -17,12 +17,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.navigation.compose.hiltViewModel
 import team.kid.roadsafety.R
 import team.kid.roadsafety.presentation.auth.AuthNavigation
 import team.kid.roadsafety.presentation.map.MapColoringScreen
-import team.kid.roadsafety.presentation.theme.RoadSafetyTheme
 
 @Composable
 fun RoadSafetyApp(viewModel: MainViewModel = hiltViewModel()) {
@@ -35,6 +33,7 @@ fun RoadSafetyApp(viewModel: MainViewModel = hiltViewModel()) {
             }
         }
         is AuthState.Authenticated -> {
+            // FamilyCheckScreen(onLogout = viewModel::logout)
             MainScreen(onLogout = viewModel::logout)
         }
         is AuthState.Unauthenticated -> {

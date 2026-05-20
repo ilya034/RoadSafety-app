@@ -1,8 +1,7 @@
 package team.kid.roadsafety.data.remote
 
 import retrofit2.Response
-import retrofit2.http.Body
-import retrofit2.http.POST
+import retrofit2.http.*
 import team.kid.roadsafety.data.dto.*
 
 interface RoadSafetyApi {
@@ -26,4 +25,19 @@ interface RoadSafetyApi {
 
     @GET("families/{familyId}/members")
     suspend fun getFamilyMembers(@Path("familyId") familyId: String): Response<List<FamilyMemberResponseDto>>
+
+    @GET("map/areas")
+    suspend fun getAreas(@Query("cityId") cityId: String?): Response<List<MapAreaResponseDto>>
+
+    @GET("families/{familyId}/map/areas")
+    suspend fun getUserAreas(
+        @Path("familyId") familyId: String,
+        @Query("childId") childId: String?
+    ): Response<List<MapAreaResponseDto>>
+
+    @PATCH("map/areas/{areaId}/color")
+    suspend fun updateAreaColor(
+        @Path("areaId") areaId: String,
+        @Body request: UpdateAreaColorRequestDto
+    ): Response<Unit>
 }
