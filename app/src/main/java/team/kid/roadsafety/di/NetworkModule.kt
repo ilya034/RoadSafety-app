@@ -9,8 +9,9 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
-import retrofit2.converter.kotlinxserialization.asConverterFactory
+import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import team.kid.roadsafety.data.remote.RoadSafetyApi
+import team.kid.roadsafety.BuildConfig
 import javax.inject.Singleton
 
 @Module
@@ -38,7 +39,7 @@ object NetworkModule {
     @Singleton
     fun provideRetrofit(okHttpClient: OkHttpClient, json: Json): Retrofit {
         return Retrofit.Builder()
-            .baseUrl("http://localhost:5103/api/") // Adjust as needed
+            .baseUrl(BuildConfig.BASE_URL)
             .client(okHttpClient)
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()
