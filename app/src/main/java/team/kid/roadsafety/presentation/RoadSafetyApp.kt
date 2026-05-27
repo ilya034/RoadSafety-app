@@ -13,55 +13,41 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.tooling.preview.PreviewScreenSizes
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import team.kid.roadsafety.R
-import team.kid.roadsafety.data.local.SessionManager
-import team.kid.roadsafety.presentation.theme.RoadSafetyTheme
+import team.kid.roadsafety.presentation.auth.AuthNavigation
+import team.kid.roadsafety.presentation.map.MapColoringScreen
 
 @Composable
-@Preview
-fun RoadSafetyApp() {
-    val context = LocalContext.current
-    val sessionManager = remember { SessionManager(context) }
-    val viewModel: MainViewModel = viewModel(factory = object : androidx.lifecycle.ViewModelProvider.Factory {
-        override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
-            return MainViewModel(sessionManager) as T
+fun RoadSafetyApp(viewModel: MainViewModel = hiltViewModel()) {
+    val authState by viewModel.authState.collectAsState()
+
+    when (authState) {
+        is AuthState.Loading -> {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
         }
-    })
-
-    val uiState by viewModel.uiState.collectAsState()
-
-    RoadSafetyTheme {
-        when (uiState) {
-            MainUiState.Loading -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-            }
-            MainUiState.NotAuthenticated -> {
-                AuthScreen(sessionManager)
-            }
-            MainUiState.AuthenticatedNoFamily -> {
-                FamilySelectionScreen(sessionManager)
-            }
-            MainUiState.AuthenticatedWithFamily -> {
-                MainAppContent(sessionManager)
-            }
+        is AuthState.Authenticated -> {
+            // FamilyCheckScreen(onLogout = viewModel::logout)
+            MainScreen(onLogout = viewModel::logout)
+        }
+        is AuthState.Unauthenticated -> {
+            AuthNavigation(onAuthSuccess = viewModel::onAuthSuccess)
         }
     }
 }
 
 @Composable
-fun MainAppContent(sessionManager: SessionManager) {
-    var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.PROFILE) }
+fun MainScreen(onLogout: () -> Unit) {
+    var currentDestination by remember { 
+        mutableStateOf(AppDestinations.MAP)
+    }
 
     NavigationSuiteScaffold(
         navigationSuiteItems = {
@@ -82,12 +68,29 @@ fun MainAppContent(sessionManager: SessionManager) {
     ) {
         Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
             when (currentDestination) {
-                AppDestinations.PROFILE -> ProfileScreen(sessionManager, Modifier.padding(innerPadding))
-                else -> Greeting(
-                    name = currentDestination.label,
-                    modifier = Modifier.padding(innerPadding)
-                )
+                AppDestinations.MAP -> MapColoringScreen(modifier = Modifier.padding(innerPadding))
+                AppDestinations.PROFILE -> {
+                    ProfileScreen(
+                        onLogout = onLogout,
+                        modifier = Modifier.padding(innerPadding)
+                    )
+                }
+                else -> {
+                    Greeting(
+                        name = currentDestination.label,
+                        modifier = Modifier.padding(innerPadding)
+                    )
+                }
             }
+        }
+    }
+}
+
+@Composable
+fun ProfileScreen(onLogout: () -> Unit, modifier: Modifier = Modifier) {
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        androidx.compose.material3.Button(onClick = onLogout) {
+            Text("Logout")
         }
     }
 }
@@ -108,12 +111,4 @@ fun Greeting(name: String, modifier: Modifier = Modifier) {
         text = "Hello $name!",
         modifier = modifier
     )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    RoadSafetyTheme {
-        Greeting("Android")
-    }
 }

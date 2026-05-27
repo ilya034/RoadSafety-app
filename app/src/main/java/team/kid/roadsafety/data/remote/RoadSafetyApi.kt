@@ -1,105 +1,43 @@
 package team.kid.roadsafety.data.remote
 
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.plugins.*
-import io.ktor.client.plugins.auth.*
-import io.ktor.client.plugins.auth.providers.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.plugins.logging.*
-import io.ktor.client.request.*
-import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
-import kotlinx.coroutines.flow.first
-import kotlinx.serialization.json.Json
-import team.kid.roadsafety.data.local.SessionManager
-import team.kid.roadsafety.data.remote.dto.*
+import retrofit2.Response
+import retrofit2.http.*
+import team.kid.roadsafety.data.dto.*
 
-class RoadSafetyApi(
-    private val sessionManager: SessionManager
-) {
-    private val client = HttpClient {
-        install(ContentNegotiation) {
-            json(Json {
-                ignoreUnknownKeys = true
-                prettyPrint = true
-                isLenient = true
-            })
-        }
-        install(Logging) {
-            level = LogLevel.ALL
-        }
-        install(Auth) {
-            bearer {
-                loadTokens {
-                    val accessToken = sessionManager.accessToken.first()
-                    val refreshToken = sessionManager.refreshToken.first()
-                    if (accessToken != null && refreshToken != null) {
-                        BearerTokens(accessToken, refreshToken)
-                    } else null
-                }
-                refreshTokens {
-                    val refreshToken = sessionManager.refreshToken.first() ?: return@refreshTokens null
-                    try {
-                        val response = client.post("http://localhost:5103/api/auth/refresh") {
-                            setBody(RefreshTokensRequest(refreshToken))
-                            contentType(ContentType.Application.Json)
-                            markAsRefreshTokenRequest()
-                        }.body<RefreshTokensResponse>()
-                        
-                        val userId = sessionManager.userId.first() ?: ""
-                        sessionManager.saveSession(userId, response.accessToken, response.refreshToken)
-                        
-                        BearerTokens(response.accessToken, response.refreshToken)
-                    } catch (e: Exception) {
-                        sessionManager.clearSession()
-                        null
-                    }
-                }
-            }
-        }
-        defaultRequest {
-            url("http://localhost:5103/api/")
-        }
-    }
+interface RoadSafetyApi {
+    @POST("auth/login")
+    suspend fun login(@Body request: LoginRequestDto): Response<AuthResponseDto>
 
-    suspend fun register(request: RegisterRequest): AuthResponse =
-        client.post("auth/register") {
-            setBody(request)
-            contentType(ContentType.Application.Json)
-        }.body()
+    @POST("auth/register")
+    suspend fun register(@Body request: RegisterRequestDto): Response<AuthResponseDto>
 
-    suspend fun login(request: LoginRequest): AuthResponse =
-        client.post("auth/login") {
-            setBody(request)
-            contentType(ContentType.Application.Json)
-        }.body()
+    @POST("families")
+    suspend fun createFamily(@Body request: FamilyCreateRequestDto): Response<FamilyResponseDto>
 
-    suspend fun createFamily(request: CreateFamilyRequest): CreateFamilyResponse =
-        client.post("families") {
-            setBody(request)
-            contentType(ContentType.Application.Json)
-        }.body()
+    @POST("families/join")
+    suspend fun joinFamily(@Body request: FamilyJoinRequestDto): Response<FamilyMemberResponseDto>
 
-    suspend fun joinFamily(request: JoinFamilyByInviteCodeRequest): JoinFamilyByInviteCodeResponse =
-        client.post("families/join-by-invite") {
-            setBody(request)
-            contentType(ContentType.Application.Json)
-        }.body()
+    @POST("families/{familyId}/invites")
+    suspend fun createInviteCode(@Path("familyId") familyId: String): Response<InviteCodeResponseDto>
 
-    suspend fun getFamilyMembers(familyId: String): GetFamilyMembersResponse =
-        client.get("families/$familyId/members").body()
+    @GET("families/{familyId}")
+    suspend fun getFamily(@Path("familyId") familyId: String): Response<FamilyResponseDto>
 
-    suspend fun createInviteCode(request: CreateInviteCodeRequest): CreateInviteCodeResponse =
-        client.post("families/invite-code") {
-            setBody(request)
-            contentType(ContentType.Application.Json)
-        }.body()
+    @GET("families/{familyId}/members")
+    suspend fun getFamilyMembers(@Path("familyId") familyId: String): Response<List<FamilyMemberResponseDto>>
 
-    suspend fun logout(refreshToken: String) {
-        client.post("auth/logout") {
-            setBody(LogOutRequest(refreshToken))
-            contentType(ContentType.Application.Json)
-        }
-    }
+    @GET("map/areas")
+    suspend fun getAreas(@Query("cityId") cityId: String?): Response<List<MapAreaResponseDto>>
+
+    @GET("families/{familyId}/map/areas")
+    suspend fun getUserAreas(
+        @Path("familyId") familyId: String,
+        @Query("childId") childId: String?
+    ): Response<List<MapAreaResponseDto>>
+
+    @PATCH("map/areas/{areaId}/color")
+    suspend fun updateAreaColor(
+        @Path("areaId") areaId: String,
+        @Body request: UpdateAreaColorRequestDto
+    ): Response<Unit>
 }
