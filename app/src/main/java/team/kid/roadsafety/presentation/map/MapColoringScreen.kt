@@ -1,0 +1,203 @@
+package team.kid.roadsafety.presentation.map
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import kotlinx.coroutines.delay
+import kotlinx.serialization.json.*
+import org.maplibre.compose.map.MaplibreMap
+import org.maplibre.compose.camera.CameraPosition
+import org.maplibre.compose.camera.rememberCameraState
+import org.maplibre.compose.expressions.dsl.*
+import org.maplibre.compose.layers.FillLayer
+import org.maplibre.compose.layers.LineLayer
+import org.maplibre.compose.sources.GeoJsonData
+import org.maplibre.compose.sources.rememberGeoJsonSource
+import org.maplibre.compose.style.BaseStyle
+import org.maplibre.compose.util.ClickResult
+import org.maplibre.spatialk.geojson.Feature as GeoJsonFeature
+import org.maplibre.spatialk.geojson.*
+import team.kid.roadsafety.domain.aggregates.map.MapAreaColor
+
+@Composable
+fun MapColoringScreen(
+    modifier: Modifier = Modifier,
+    viewModel: MapViewModel = hiltViewModel()
+) {
+    val state by viewModel.uiState.collectAsState()
+    val cameraState = rememberCameraState(
+        firstPosition = CameraPosition(
+            target = Position(37.6173, 55.7558),
+            zoom = 12.0
+        )
+    )
+
+    val featureCollection = remember(state.areas) {
+        val features = state.areas.map { area ->
+            val polygon = Polygon(listOf(area.points.map { Position(it.longitude, it.latitude) }))
+            val colorHex = when (area.color) {
+                MapAreaColor.GREEN -> "#4CAF50"
+                MapAreaColor.YELLOW -> "#FFEB3B"
+                MapAreaColor.RED -> "#F44336"
+                MapAreaColor.NONE -> "#BDBDBD"
+            }
+            val properties = JsonObject(mapOf("color" to JsonPrimitive(colorHex)))
+            GeoJsonFeature(polygon, properties, JsonPrimitive(area.id.value.toString()))
+        }
+        FeatureCollection(features)
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        MaplibreMap(
+            modifier = Modifier.fillMaxSize(),
+            baseStyle = BaseStyle.Uri("https://tiles.openfreemap.org/styles/bright"),
+            cameraState = cameraState
+        ) {
+            if (featureCollection.features.isNotEmpty()) {
+                key(state.areas) {
+                    val geoJsonSource = rememberGeoJsonSource(
+                        data = GeoJsonData.Features(featureCollection)
+                    )
+
+                    FillLayer(
+                        id = "blocks-fill",
+                        source = geoJsonSource,
+                        color = feature["color"].convertToColor(),
+                        opacity = const(0.4f),
+                        onClick = { clickedFeatures ->
+                            val clickedFeature = clickedFeatures.firstOrNull()
+                            val id = clickedFeature?.id?.jsonPrimitive?.content
+                            if (id != null) {
+                                val area = state.areas.find { it.id.value.toString() == id }
+                                if (area != null) {
+                                    viewModel.onAreaClicked(area)
+                                }
+                                ClickResult.Consume
+                            } else {
+                                ClickResult.Pass
+                            }
+                        }
+                    )
+
+                    LineLayer(
+                        id = "blocks-outline",
+                        source = geoJsonSource,
+                        color = const(Color.Black),
+                        width = const(1.dp)
+                    )
+                }
+            }
+        }
+
+        // Side Paint Panel
+        PaintPanel(
+            selectedColor = state.activePaintColor,
+            onColorSelected = viewModel::onPaintColorSelected,
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 16.dp)
+        )
+
+        if (state.isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.align(Alignment.Center)
+            )
+        }
+        
+        state.error?.let { errorMsg ->
+            LaunchedEffect(errorMsg) {
+                delay(3000)
+                viewModel.clearError()
+            }
+            Snackbar(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(16.dp)
+            ) {
+                Text(errorMsg)
+            }
+        }
+    }
+}
+
+@Composable
+fun PaintPanel(
+    selectedColor: MapAreaColor?,
+    onColorSelected: (MapAreaColor?) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.width(60.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Colors
+            listOf(
+                MapAreaColor.RED to Color(0xFFF44336),
+                MapAreaColor.YELLOW to Color(0xFFFFEB3B),
+                MapAreaColor.GREEN to Color(0xFF4CAF50),
+                MapAreaColor.NONE to Color(0xFFBDBDBD)
+            ).forEach { (domainColor, composeColor) ->
+                val isSelected = selectedColor == domainColor
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(composeColor)
+                        .border(
+                            width = if (isSelected) 3.dp else 0.dp,
+                            color = if (isSelected) Color.White else Color.Transparent,
+                            shape = CircleShape
+                        )
+                        .clickable { 
+                            if (isSelected) onColorSelected(null)
+                            else onColorSelected(domainColor)
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (domainColor == MapAreaColor.NONE) {
+                        Text("X", color = Color.White, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))
+
+            // Tool Switch (Selection mode)
+            FilledIconButton(
+                onClick = { onColorSelected(null) },
+                modifier = Modifier.size(40.dp),
+                colors = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = if (selectedColor == null) 
+                        MaterialTheme.colorScheme.primaryContainer 
+                    else 
+                        MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Text(
+                    "OFF", 
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (selectedColor == null) 
+                        MaterialTheme.colorScheme.onPrimaryContainer 
+                    else 
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}

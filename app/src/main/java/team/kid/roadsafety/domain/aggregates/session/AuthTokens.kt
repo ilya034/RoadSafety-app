@@ -1,4 +1,4 @@
-package team.kid.roadsafety.domain.valueObjects
+package team.kid.roadsafety.domain.aggregates.session
 
 data class AuthTokens(
     val accessToken: String,
