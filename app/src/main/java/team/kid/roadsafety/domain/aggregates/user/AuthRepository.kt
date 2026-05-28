@@ -1,10 +1,12 @@
 package team.kid.roadsafety.domain.aggregates.user
 
+import team.kid.roadsafety.data.dto.AuthResponseDto
+import team.kid.roadsafety.data.dto.UserResponseDto
 import team.kid.roadsafety.domain.aggregates.session.AuthTokens
 import java.time.LocalDate
 
 interface AuthRepository {
-    suspend fun login(login: String, password: String): Result<AuthTokens>
+    suspend fun login(login: String, password: String): Result<AuthResponseDto>
     
     suspend fun register(
         login: String,
@@ -12,7 +14,9 @@ interface AuthRepository {
         firstName: String?,
         lastName: String?,
         birthDate: LocalDate?
-    ): Result<AuthTokens>
+    ): Result<AuthResponseDto>
+
+    suspend fun getCurrentUser(): Result<UserResponseDto>
 
     suspend fun logout(): Result<Unit>
     

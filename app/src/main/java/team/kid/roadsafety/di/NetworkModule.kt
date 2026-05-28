@@ -12,6 +12,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import team.kid.roadsafety.data.remote.RoadSafetyApi
 import team.kid.roadsafety.BuildConfig
+import team.kid.roadsafety.infrastructure.AuthInterceptor
 import javax.inject.Singleton
 
 @Module
@@ -27,8 +28,9 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(): OkHttpClient {
+    fun provideOkHttpClient(authInterceptor: AuthInterceptor): OkHttpClient {
         return OkHttpClient.Builder()
+            .addInterceptor(authInterceptor)
             .addInterceptor(HttpLoggingInterceptor().apply {
                 level = HttpLoggingInterceptor.Level.BODY
             })

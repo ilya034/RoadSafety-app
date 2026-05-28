@@ -1,5 +1,6 @@
 package team.kid.roadsafety.presentation.auth
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -7,6 +8,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import team.kid.roadsafety.data.dto.UserResponseDto
 import team.kid.roadsafety.domain.aggregates.user.AuthRepository
 import javax.inject.Inject
 
@@ -26,16 +28,19 @@ class LoginViewModel @Inject constructor(
         _uiState.update { it.copy(password = password) }
     }
 
-    fun login(onSuccess: () -> Unit) {
+    fun login(onSuccess: (UserResponseDto?) -> Unit) {
         viewModelScope.launch {
+            Log.d("LoginViewModel", "Login initiated for: ${_uiState.value.login}")
             _uiState.update { it.copy(isLoading = true, error = null) }
             val result = authRepository.login(_uiState.value.login, _uiState.value.password)
             result.fold(
-                onSuccess = {
+                onSuccess = { response ->
+                    Log.d("LoginViewModel", "Login successful, user data in response: ${response.user}")
                     _uiState.update { it.copy(isLoading = false) }
-                    onSuccess()
+                    onSuccess(response.user)
                 },
                 onFailure = { error ->
+                    Log.e("LoginViewModel", "Login failed", error)
                     _uiState.update { it.copy(isLoading = false, error = error.message) }
                 }
             )

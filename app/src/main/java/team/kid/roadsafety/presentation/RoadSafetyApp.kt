@@ -20,21 +20,25 @@ import androidx.compose.ui.res.painterResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import team.kid.roadsafety.R
 import team.kid.roadsafety.presentation.auth.AuthNavigation
+import team.kid.roadsafety.presentation.family.FamilyOnboardingScreen
 import team.kid.roadsafety.presentation.map.MapColoringScreen
+import team.kid.roadsafety.presentation.profile.ProfileScreen
 
 @Composable
 fun RoadSafetyApp(viewModel: MainViewModel = hiltViewModel()) {
     val authState by viewModel.authState.collectAsState()
 
-    when (authState) {
+    when (val state = authState) {
         is AuthState.Loading -> {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
         }
         is AuthState.Authenticated -> {
-            // FamilyCheckScreen(onLogout = viewModel::logout)
             MainScreen(onLogout = viewModel::logout)
+        }
+        is AuthState.AuthenticatedButNoFamily -> {
+            FamilyOnboardingScreen(onSuccess = viewModel::onAuthSuccess)
         }
         is AuthState.Unauthenticated -> {
             AuthNavigation(onAuthSuccess = viewModel::onAuthSuccess)
@@ -81,15 +85,6 @@ fun MainScreen(onLogout: () -> Unit) {
                     )
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun ProfileScreen(onLogout: () -> Unit, modifier: Modifier = Modifier) {
-    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        androidx.compose.material3.Button(onClick = onLogout) {
-            Text("Logout")
         }
     }
 }

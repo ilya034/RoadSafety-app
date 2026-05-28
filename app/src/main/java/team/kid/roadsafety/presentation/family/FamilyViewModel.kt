@@ -51,11 +51,11 @@ class FamilyViewModel @Inject constructor(
     fun joinFamily() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
-            familyRepository.joinFamily(_uiState.value.inviteCode)
+            val role = _uiState.value.userRole ?: UserRole.CHILD
+            familyRepository.joinFamily(_uiState.value.inviteCode, role)
                 .fold(
                     onSuccess = { member ->
                         _uiState.update { it.copy(isLoading = false, isJoined = true) }
-                        // Optionally fetch family details here
                     },
                     onFailure = { error ->
                         _uiState.update { it.copy(isLoading = false, error = error.message) }
