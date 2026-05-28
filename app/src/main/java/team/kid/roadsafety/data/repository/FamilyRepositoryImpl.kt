@@ -2,8 +2,7 @@ package team.kid.roadsafety.data.repository
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
-import team.kid.roadsafety.data.dto.FamilyCreateRequestDto
-import team.kid.roadsafety.data.dto.FamilyJoinRequestDto
+import team.kid.roadsafety.data.dto.*
 import team.kid.roadsafety.data.remote.RoadSafetyApi
 import team.kid.roadsafety.domain.FamilyId
 import team.kid.roadsafety.domain.aggregates.family.FamilyEntity
@@ -27,9 +26,9 @@ class FamilyRepositoryImpl @Inject constructor(
                 val body = response.body()!!
                 Result.success(
                     FamilyEntity(
-                        id = FamilyId(UUID.fromString(body.id)),
-                        name = body.name,
-                        createdAt = body.createdAt
+                        id = FamilyId(UUID.fromString(body.familyId)),
+                        name = body.name ?: "",
+                        createdAt = "" // Removed from contract
                     )
                 )
             } else {
@@ -40,18 +39,18 @@ class FamilyRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun joinFamily(inviteCode: String): Result<FamilyMemberEntity> {
+    override suspend fun joinFamily(inviteCode: String, role: UserRole): Result<FamilyMemberEntity> {
         return try {
-            val response = api.joinFamily(FamilyJoinRequestDto(inviteCode))
+            val response = api.joinFamily(JoinFamilyByInviteCodeRequestDto(inviteCode, role.name))
             if (response.isSuccessful) {
                 val body = response.body()!!
                 Result.success(
                     FamilyMemberEntity(
-                        id = body.id,
+                        id = UUID.randomUUID().toString(),
                         familyId = FamilyId(UUID.fromString(body.familyId)),
                         userId = body.userId,
                         role = UserRole.valueOf(body.role.uppercase()),
-                        joinedAt = body.joinedAt
+                        joinedAt = ""
                     )
                 )
             } else {
@@ -62,11 +61,11 @@ class FamilyRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun generateInviteCode(familyId: FamilyId): Result<String> {
+    override suspend fun generateInviteCode(role: UserRole): Result<String> {
         return try {
-            val response = api.createInviteCode(familyId.value.toString())
+            val response = api.createInviteCode(CreateInviteCodeRequestDto(role.name))
             if (response.isSuccessful) {
-                Result.success(response.body()!!.code)
+                Result.success(response.body()!!.inviteCode)
             } else {
                 Result.failure(Exception("Invite code generation failed: ${response.code()}"))
             }
@@ -82,9 +81,9 @@ class FamilyRepositoryImpl @Inject constructor(
                 val body = response.body()!!
                 Result.success(
                     FamilyEntity(
-                        id = FamilyId(UUID.fromString(body.id)),
-                        name = body.name,
-                        createdAt = body.createdAt
+                        id = FamilyId(UUID.fromString(body.familyId)),
+                        name = body.name ?: "",
+                        createdAt = ""
                     )
                 )
             } else {
@@ -99,13 +98,13 @@ class FamilyRepositoryImpl @Inject constructor(
         return try {
             val response = api.getFamilyMembers(familyId.value.toString())
             if (response.isSuccessful) {
-                Result.success(response.body()!!.map { body ->
+                Result.success(response.body()!!.members.map { body ->
                     FamilyMemberEntity(
-                        id = body.id,
-                        familyId = FamilyId(UUID.fromString(body.familyId)),
-                        userId = body.userId,
+                        id = UUID.randomUUID().toString(),
+                        familyId = familyId,
+                        userId = body.id,
                         role = UserRole.valueOf(body.role.uppercase()),
-                        joinedAt = body.joinedAt
+                        joinedAt = ""
                     )
                 })
             } else {
@@ -122,5 +121,9 @@ class FamilyRepositoryImpl @Inject constructor(
 
     override fun getSelectedRole(): UserRole? {
         return prefs.getString("selected_role", null)?.let { UserRole.valueOf(it) }
+    }
+
+    override fun clearData() {
+        prefs.edit().clear().apply()
     }
 }

@@ -5,13 +5,14 @@ import team.kid.roadsafety.domain.aggregates.user.UserRole
 
 interface FamilyRepository {
     suspend fun createFamily(name: String): Result<FamilyEntity>
-    suspend fun joinFamily(inviteCode: String): Result<FamilyMemberEntity>
-    suspend fun generateInviteCode(familyId: FamilyId): Result<String>
+    suspend fun joinFamily(inviteCode: String, role: UserRole): Result<FamilyMemberEntity>
+    suspend fun generateInviteCode(role: UserRole): Result<String>
     suspend fun getFamily(familyId: FamilyId): Result<FamilyEntity>
     suspend fun getFamilyMembers(familyId: FamilyId): Result<List<FamilyMemberEntity>>
 
     fun setSelectedRole(role: UserRole)
     fun getSelectedRole(): UserRole?
+    fun clearData()
 }
 
 data class FamilyEntity(

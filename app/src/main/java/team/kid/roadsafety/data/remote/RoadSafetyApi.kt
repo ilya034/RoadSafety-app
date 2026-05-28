@@ -11,20 +11,23 @@ interface RoadSafetyApi {
     @POST("auth/register")
     suspend fun register(@Body request: RegisterRequestDto): Response<AuthResponseDto>
 
+    @GET("users/me")
+    suspend fun getCurrentUser(): Response<UserResponseDto>
+
     @POST("families")
     suspend fun createFamily(@Body request: FamilyCreateRequestDto): Response<FamilyResponseDto>
 
-    @POST("families/join")
-    suspend fun joinFamily(@Body request: FamilyJoinRequestDto): Response<FamilyMemberResponseDto>
+    @POST("families/invite-code")
+    suspend fun createInviteCode(@Body request: CreateInviteCodeRequestDto): Response<InviteCodeResponseDto>
 
-    @POST("families/{familyId}/invites")
-    suspend fun createInviteCode(@Path("familyId") familyId: String): Response<InviteCodeResponseDto>
+    @POST("families/join-by-invite")
+    suspend fun joinFamily(@Body request: JoinFamilyByInviteCodeRequestDto): Response<JoinFamilyByInviteCodeResponseDto>
 
     @GET("families/{familyId}")
     suspend fun getFamily(@Path("familyId") familyId: String): Response<FamilyResponseDto>
 
     @GET("families/{familyId}/members")
-    suspend fun getFamilyMembers(@Path("familyId") familyId: String): Response<List<FamilyMemberResponseDto>>
+    suspend fun getFamilyMembers(@Path("familyId") familyId: String): Response<GetFamilyMembersResponseDto>
 
     @GET("map/areas")
     suspend fun getAreas(@Query("cityId") cityId: String?): Response<List<MapAreaResponseDto>>

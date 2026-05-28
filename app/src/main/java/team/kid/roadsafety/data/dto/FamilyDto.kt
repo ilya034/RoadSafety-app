@@ -4,34 +4,52 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class FamilyCreateRequestDto(
-    val name: String
+    val name: String? = null
 )
 
 @Serializable
 data class FamilyJoinRequestDto(
-    val inviteCode: String
+    val inviteCode: String,
+    val role: String
+)
+
+@Serializable
+data class JoinFamilyByInviteCodeRequestDto(
+    val inviteCode: String,
+    val role: String
+)
+
+@Serializable
+data class JoinFamilyByInviteCodeResponseDto(
+    val userId: String,
+    val familyId: String,
+    val role: String
+)
+
+@Serializable
+data class CreateInviteCodeRequestDto(
+    val inviteCodeRole: String
 )
 
 @Serializable
 data class FamilyResponseDto(
-    val id: String,
-    val name: String,
-    val createdAt: String,
+    val familyId: String,
+    val name: String? = null,
     val createdByUserId: String
 )
 
 @Serializable
-data class FamilyMemberResponseDto(
+data class GetFamilyMembersResponseDto(
+    val members: List<MemberDto>
+)
+
+@Serializable
+data class MemberDto(
     val id: String,
-    val familyId: String,
-    val userId: String,
-    val role: String,
-    val joinedAt: String
+    val role: String
 )
 
 @Serializable
 data class InviteCodeResponseDto(
-    val code: String,
-    val deepLink: String,
-    val expiresAt: String
+    val inviteCode: String
 )

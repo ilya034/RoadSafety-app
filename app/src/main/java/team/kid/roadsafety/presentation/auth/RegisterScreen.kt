@@ -22,6 +22,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import team.kid.roadsafety.data.dto.UserResponseDto
 import team.kid.roadsafety.domain.aggregates.user.UserRole
 import team.kid.roadsafety.presentation.theme.RolePurple
 import team.kid.roadsafety.presentation.theme.RoleRed
@@ -30,7 +31,7 @@ import team.kid.roadsafety.presentation.theme.TextGrey
 @Composable
 fun RegisterScreen(
     onLoginClick: () -> Unit,
-    onRegisterSuccess: () -> Unit,
+    onRegisterSuccess: (UserResponseDto?) -> Unit,
     viewModel: RegisterViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()

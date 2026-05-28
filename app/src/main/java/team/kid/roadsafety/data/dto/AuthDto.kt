@@ -18,12 +18,25 @@ data class RegisterRequestDto(
 )
 
 @Serializable
+data class UserResponseDto(
+    val id: String,
+    val email: String? = null,
+    val phoneNumber: String? = null,
+    val firstName: String? = null,
+    val lastName: String? = null,
+    val patronymic: String? = null,
+    val birthDate: String? = null,
+    val familyId: String? = null
+)
+
+@Serializable
 data class AuthResponseDto(
     val userId: String,
     val accessToken: String,
     val accessTokenExpiresAt: String,
     val refreshToken: String,
-    val refreshTokenExpiresAt: String
+    val refreshTokenExpiresAt: String,
+    val user: UserResponseDto? = null
 )
 
 @Serializable

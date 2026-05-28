@@ -5,13 +5,15 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 
+import team.kid.roadsafety.data.dto.UserResponseDto
+
 sealed class AuthScreen(val route: String) {
     object Login : AuthScreen("login")
     object Register : AuthScreen("register")
 }
 
 @Composable
-fun AuthNavigation(onAuthSuccess: () -> Unit) {
+fun AuthNavigation(onAuthSuccess: (UserResponseDto?) -> Unit) {
     val navController = rememberNavController()
 
     NavHost(navController = navController, startDestination = AuthScreen.Login.route) {

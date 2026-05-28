@@ -1,8 +1,10 @@
 package team.kid.roadsafety.data.repository
 
+import team.kid.roadsafety.data.dto.AuthResponseDto
 import team.kid.roadsafety.data.dto.LoginRequestDto
 import team.kid.roadsafety.data.dto.RegisterRequestDto
 import team.kid.roadsafety.data.remote.RoadSafetyApi
+import team.kid.roadsafety.data.dto.UserResponseDto
 import team.kid.roadsafety.domain.aggregates.session.AuthTokens
 import team.kid.roadsafety.domain.aggregates.user.AuthRepository
 import team.kid.roadsafety.infrastructure.TokenManager
@@ -15,14 +17,14 @@ class AuthRepositoryImpl @Inject constructor(
     private val tokenManager: TokenManager
 ) : AuthRepository {
 
-    override suspend fun login(login: String, password: String): Result<AuthTokens> {
+    override suspend fun login(login: String, password: String): Result<AuthResponseDto> {
         return try {
             val response = api.login(LoginRequestDto(login, password))
             if (response.isSuccessful) {
                 val body = response.body()!!
                 val tokens = AuthTokens(body.accessToken, body.refreshToken)
                 tokenManager.saveTokens(tokens)
-                Result.success(tokens)
+                Result.success(body)
             } else {
                 Result.failure(Exception("Login failed: ${response.code()}"))
             }
@@ -37,7 +39,7 @@ class AuthRepositoryImpl @Inject constructor(
         firstName: String?,
         lastName: String?,
         birthDate: LocalDate?
-    ): Result<AuthTokens> {
+    ): Result<AuthResponseDto> {
         return try {
             val request = RegisterRequestDto(
                 login = login,
@@ -51,9 +53,22 @@ class AuthRepositoryImpl @Inject constructor(
                 val body = response.body()!!
                 val tokens = AuthTokens(body.accessToken, body.refreshToken)
                 tokenManager.saveTokens(tokens)
-                Result.success(tokens)
+                Result.success(body)
             } else {
                 Result.failure(Exception("Registration failed: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun getCurrentUser(): Result<UserResponseDto> {
+        return try {
+            val response = api.getCurrentUser()
+            if (response.isSuccessful) {
+                Result.success(response.body()!!)
+            } else {
+                Result.failure(Exception("Failed to get current user: ${response.code()}"))
             }
         } catch (e: Exception) {
             Result.failure(e)
