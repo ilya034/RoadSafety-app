@@ -16,6 +16,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import android.widget.Toast
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -31,6 +36,10 @@ fun ProfileScreen(
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+
+    LaunchedEffect(Unit) {
+        viewModel.loadProfile()
+    }
 
     Box(modifier = modifier.fillMaxSize().background(Color.White)) {
         if (state.isLoading && state.user == null) {
@@ -247,6 +256,9 @@ fun MemberItem(member: FamilyMemberEntity) {
 
 @Composable
 fun InviteCodeDialog(code: String, onDismiss: () -> Unit) {
+    val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
+
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(16.dp),
@@ -266,6 +278,10 @@ fun InviteCodeDialog(code: String, onDismiss: () -> Unit) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     code,
+                    modifier = Modifier.clickable {
+                        clipboardManager.setText(AnnotatedString(code))
+                        Toast.makeText(context, "Код скопирован", Toast.LENGTH_SHORT).show()
+                    },
                     fontSize = 32.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = ButtonGreen,
