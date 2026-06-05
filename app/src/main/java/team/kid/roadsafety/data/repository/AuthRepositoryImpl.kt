@@ -3,11 +3,12 @@ package team.kid.roadsafety.data.repository
 import team.kid.roadsafety.data.dto.AuthResponseDto
 import team.kid.roadsafety.data.dto.LoginRequestDto
 import team.kid.roadsafety.data.dto.RegisterRequestDto
-import team.kid.roadsafety.data.remote.RoadSafetyApi
 import team.kid.roadsafety.data.dto.UserResponseDto
+import team.kid.roadsafety.data.remote.RoadSafetyApi
 import team.kid.roadsafety.domain.aggregates.session.AuthTokens
 import team.kid.roadsafety.domain.aggregates.user.AuthRepository
 import team.kid.roadsafety.infrastructure.TokenManager
+import team.kid.roadsafety.infrastructure.parseErrorMessage
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
@@ -26,7 +27,7 @@ class AuthRepositoryImpl @Inject constructor(
                 tokenManager.saveTokens(tokens)
                 Result.success(body)
             } else {
-                Result.failure(Exception("Login failed: ${response.code()}"))
+                Result.failure(Exception(response.parseErrorMessage("Login failed")))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -55,7 +56,7 @@ class AuthRepositoryImpl @Inject constructor(
                 tokenManager.saveTokens(tokens)
                 Result.success(body)
             } else {
-                Result.failure(Exception("Registration failed: ${response.code()}"))
+                Result.failure(Exception(response.parseErrorMessage("Registration failed")))
             }
         } catch (e: Exception) {
             Result.failure(e)

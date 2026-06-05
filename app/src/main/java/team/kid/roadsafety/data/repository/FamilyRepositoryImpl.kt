@@ -2,13 +2,16 @@ package team.kid.roadsafety.data.repository
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
-import team.kid.roadsafety.data.dto.*
+import team.kid.roadsafety.data.dto.CreateInviteCodeRequestDto
+import team.kid.roadsafety.data.dto.FamilyCreateRequestDto
+import team.kid.roadsafety.data.dto.JoinFamilyByInviteCodeRequestDto
 import team.kid.roadsafety.data.remote.RoadSafetyApi
 import team.kid.roadsafety.domain.FamilyId
 import team.kid.roadsafety.domain.aggregates.family.FamilyEntity
 import team.kid.roadsafety.domain.aggregates.family.FamilyMemberEntity
 import team.kid.roadsafety.domain.aggregates.family.FamilyRepository
 import team.kid.roadsafety.domain.aggregates.user.UserRole
+import team.kid.roadsafety.infrastructure.parseErrorMessage
 import java.util.UUID
 import javax.inject.Inject
 
@@ -32,7 +35,7 @@ class FamilyRepositoryImpl @Inject constructor(
                     )
                 )
             } else {
-                Result.failure(Exception("Family creation failed: ${response.code()}"))
+                Result.failure(Exception(response.parseErrorMessage("Family creation failed")))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -54,7 +57,7 @@ class FamilyRepositoryImpl @Inject constructor(
                     )
                 )
             } else {
-                Result.failure(Exception("Join family failed: ${response.code()}"))
+                Result.failure(Exception(response.parseErrorMessage("Join family failed")))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -67,7 +70,7 @@ class FamilyRepositoryImpl @Inject constructor(
             if (response.isSuccessful) {
                 Result.success(response.body()!!.inviteCode)
             } else {
-                Result.failure(Exception("Invite code generation failed: ${response.code()}"))
+                Result.failure(Exception(response.parseErrorMessage("Invite code generation failed")))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -87,7 +90,7 @@ class FamilyRepositoryImpl @Inject constructor(
                     )
                 )
             } else {
-                Result.failure(Exception("Get family failed: ${response.code()}"))
+                Result.failure(Exception(response.parseErrorMessage("Get family failed")))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -108,7 +111,7 @@ class FamilyRepositoryImpl @Inject constructor(
                     )
                 })
             } else {
-                Result.failure(Exception("Get members failed: ${response.code()}"))
+                Result.failure(Exception(response.parseErrorMessage("Get members failed")))
             }
         } catch (e: Exception) {
             Result.failure(e)
