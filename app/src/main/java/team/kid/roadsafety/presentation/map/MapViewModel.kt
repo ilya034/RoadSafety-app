@@ -34,7 +34,7 @@ class MapViewModel @Inject constructor(
                         _uiState.update { it.copy(isLoading = false, areas = finalAreas) }
                     },
                     onFailure = { error ->
-                        _uiState.update { it.copy(isLoading = false, areas = getMockAreas(), error = "Using mock data: \${error.message}") }
+                        _uiState.update { it.copy(isLoading = false, areas = getMockAreas(), error = "Using mock data: ${error.message}") }
                     }
                 )
         }

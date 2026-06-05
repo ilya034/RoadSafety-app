@@ -9,6 +9,7 @@ import team.kid.roadsafety.domain.aggregates.map.GeoPoint
 import team.kid.roadsafety.domain.aggregates.map.MapArea
 import team.kid.roadsafety.domain.aggregates.map.MapAreaColor
 import team.kid.roadsafety.domain.aggregates.map.MapRepository
+import team.kid.roadsafety.infrastructure.parseErrorMessage
 import java.util.UUID
 import javax.inject.Inject
 
@@ -22,7 +23,7 @@ class MapRepositoryImpl @Inject constructor(
             if (response.isSuccessful) {
                 Result.success(response.body()?.map { it.toMapArea() } ?: emptyList())
             } else {
-                Result.failure(Exception("Failed to fetch map areas: ${response.code()}"))
+                Result.failure(Exception(response.parseErrorMessage("Failed to fetch map areas")))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -35,7 +36,7 @@ class MapRepositoryImpl @Inject constructor(
             if (response.isSuccessful) {
                 Result.success(response.body()?.map { it.toMapArea() } ?: emptyList())
             } else {
-                Result.failure(Exception("Failed to fetch user areas: ${response.code()}"))
+                Result.failure(Exception(response.parseErrorMessage("Failed to fetch user areas")))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -51,7 +52,7 @@ class MapRepositoryImpl @Inject constructor(
             if (response.isSuccessful) {
                 Result.success(Unit)
             } else {
-                Result.failure(Exception("Failed to update area color: ${response.code()}"))
+                Result.failure(Exception(response.parseErrorMessage("Failed to update area color")))
             }
         } catch (e: Exception) {
             Result.failure(e)
