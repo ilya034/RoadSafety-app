@@ -21,6 +21,9 @@ class MainViewModel @Inject constructor(
     private val _authState = MutableStateFlow<AuthState>(AuthState.Loading)
     val authState = _authState.asStateFlow()
 
+    private val _isChild = MutableStateFlow(false)
+    val isChild = _isChild.asStateFlow()
+
     init {
         Log.d("MainViewModel", "Initializing MainViewModel")
         checkAuth()
@@ -66,17 +69,45 @@ class MainViewModel @Inject constructor(
         val newState = if (user.familyId == null) {
             AuthState.AuthenticatedButNoFamily(user)
         } else {
+            val role = user.familyRole?.let { parseUserRole(it) }
+            if (role != null) {
+                familyRepository.setSelectedRole(role)
+            }
+            _isChild.update { role == team.kid.roadsafety.domain.aggregates.user.UserRole.CHILD }
             AuthState.Authenticated(user)
         }
         Log.d("MainViewModel", "Updating state to: $newState")
         _authState.update { newState }
     }
 
-    fun logout() {
+    fun logout(context: android.content.Context) {
         viewModelScope.launch {
+            stopLocationService(context)
             authRepository.logout()
             familyRepository.clearData()
             _authState.value = AuthState.Unauthenticated
+            _isChild.value = false
+        }
+    }
+    fun startLocationService(context: android.content.Context) {
+        val intent = android.content.Intent(context, team.kid.roadsafety.infrastructure.location.LocationTrackingService::class.java)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            context.startForegroundService(intent)
+        } else {
+            context.startService(intent)
+        }
+    }
+
+    private fun stopLocationService(context: android.content.Context) {
+        val intent = android.content.Intent(context, team.kid.roadsafety.infrastructure.location.LocationTrackingService::class.java)
+        context.stopService(intent)
+    }
+
+    private fun parseUserRole(value: String): team.kid.roadsafety.domain.aggregates.user.UserRole? {
+        return when (value.lowercase()) {
+            "parent" -> team.kid.roadsafety.domain.aggregates.user.UserRole.PARENT
+            "child" -> team.kid.roadsafety.domain.aggregates.user.UserRole.CHILD
+            else -> null
         }
     }
 }

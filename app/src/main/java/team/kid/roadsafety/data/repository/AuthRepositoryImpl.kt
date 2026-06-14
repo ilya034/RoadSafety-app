@@ -36,18 +36,12 @@ class AuthRepositoryImpl @Inject constructor(
 
     override suspend fun register(
         login: String,
-        password: String,
-        firstName: String?,
-        lastName: String?,
-        birthDate: LocalDate?
+        password: String
     ): Result<AuthResponseDto> {
         return try {
             val request = RegisterRequestDto(
                 login = login,
-                password = password,
-                firstName = firstName,
-                lastName = lastName,
-                birthDate = birthDate?.format(DateTimeFormatter.ISO_LOCAL_DATE)
+                password = password
             )
             val response = api.register(request)
             if (response.isSuccessful) {

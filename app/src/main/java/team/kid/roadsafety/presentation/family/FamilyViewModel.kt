@@ -36,7 +36,10 @@ class FamilyViewModel @Inject constructor(
     fun createFamily() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
-            familyRepository.createFamily(_uiState.value.newFamilyName)
+            familyRepository.createFamily(
+                name = _uiState.value.newFamilyName,
+                cityId = familyRepository.getSelectedCityId() ?: "ekb"
+            )
                 .fold(
                     onSuccess = { family ->
                         _uiState.update { it.copy(isLoading = false, currentFamily = family) }

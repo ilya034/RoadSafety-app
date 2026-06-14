@@ -3,20 +3,26 @@ package team.kid.roadsafety.data.dto
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class FamilyCreateRequestDto(
-    val name: String? = null
+data class CreateFamilyRequestDto(
+    val name: String? = null,
+    val cityId: String
 )
 
 @Serializable
-data class FamilyJoinRequestDto(
-    val inviteCode: String,
-    val role: String
+data class UpdateFamilyCityRequestDto(
+    val cityId: String
+)
+
+@Serializable
+data class CreateFamilyResponseDto(
+    val familyId: String,
+    val createdByUserId: String
 )
 
 @Serializable
 data class JoinFamilyByInviteCodeRequestDto(
     val inviteCode: String,
-    val role: String
+    val userRole: String
 )
 
 @Serializable
@@ -32,10 +38,8 @@ data class CreateInviteCodeRequestDto(
 )
 
 @Serializable
-data class FamilyResponseDto(
-    val familyId: String,
-    val name: String? = null,
-    val createdByUserId: String
+data class InviteCodeResponseDto(
+    val inviteCode: String
 )
 
 @Serializable
@@ -47,9 +51,4 @@ data class GetFamilyMembersResponseDto(
 data class MemberDto(
     val id: String,
     val role: String
-)
-
-@Serializable
-data class InviteCodeResponseDto(
-    val inviteCode: String
 )

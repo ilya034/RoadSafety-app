@@ -1,0 +1,1380 @@
+openapi: 3.1.0
+info:
+  title: RoadSafety API
+  version: "1.0.0"
+  description: |
+    REST API для приложения RoadSafety.
+    Один клиент используется и для родителей, и для детей, а роль пользователя хранится на сервере
+    и задаётся при подключении к семье.
+
+    Основной поток:
+    1. Родитель регистрируется (без роли).
+    2. Родитель присоединяется к семье или создаёт новую семью (становится parent).
+    3. Родитель генерирует одноразовый код для ребёнка.
+    4. Ребёнок регистрируется (без роли).
+    5. Ребёнок вводит код.
+    6. Сервер устанавливает ребёнку роль child и создаёт запись FamilyMember.
+
+servers:
+  - url: http://localhost:5103/api
+    description: Local development server
+
+tags:
+  - name: Auth
+  - name: Users
+  - name: Families
+  - name: Maps
+  - name: Tracking
+
+security:
+  - BearerAuth: []
+
+paths:
+  /auth/register:
+    post:
+      tags:
+        - Auth
+      summary: Register a new user
+      description: |
+        Создаёт аккаунт с email или номером телефона и сразу возвращает access/refresh токены.
+        Роль пользователя будет установлена при подключении к семье.
+      operationId: registerUser
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: User registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestProblemDetails"
+        "409":
+          description: Email or phone already used
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+
+  /auth/login:
+    post:
+      tags:
+        - Auth
+      summary: Login
+      description: Авторизация по email или телефону и паролю.
+      operationId: loginUser
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestProblemDetails"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+
+  /auth/refresh:
+    post:
+      tags:
+        - Auth
+      summary: Refresh tokens
+      operationId: refreshTokens
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshTokensRequest"
+      responses:
+        "200":
+          description: Tokens refreshed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RefreshTokensResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestProblemDetails"
+        "401":
+          description: Refresh token invalid or expired
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+
+  /auth/logout:
+    post:
+      tags:
+        - Auth
+      summary: Logout
+      description: Инвалидирует refresh token текущей сессии.
+      operationId: logoutUser
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LogOutRequest"
+      responses:
+        "204":
+          description: Logged out
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestProblemDetails"
+        "401":
+          description: Refresh token invalid or expired
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+
+  /users:
+    get:
+      tags:
+        - Users
+      summary: Get user by email or phone
+      description: Поиск пользователя по email или номеру телефона. Требует авторизации.
+      operationId: getUserByContact
+      parameters:
+        - name: email
+          in: query
+          required: false
+          schema:
+            type: string
+            format: email
+          description: Email пользователя.
+        - name: phone
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Номер телефона в E.164 формате (например +79991234567).
+      responses:
+        "200":
+          description: User found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "400":
+          description: Neither email nor phone provided
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestProblemDetails"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+
+  /users/me:
+    get:
+      tags:
+        - Users
+      summary: Get current user info
+      description: Получить информацию о текущем пользователе по ID из JWT токена, включая ID семьи.
+      operationId: getCurrentUser
+      responses:
+        "200":
+          description: Current user info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+
+  /families:
+    post:
+      tags:
+        - Families
+      summary: Create family
+      description: |
+        При создании семьи пользователю устанавливается роль `parent`.
+        Сервер автоматически создаёт запись FamilyMember для текущего пользователя.
+      operationId: createFamily
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFamilyRequest"
+      responses:
+        "201":
+          description: Family created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateFamilyResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestProblemDetails"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+
+  /families/{familyId}/city:
+    put:
+      tags:
+        - Families
+      summary: Update family city
+      description: |
+        Обновляет город для семьи. Только для пользователей с ролью parent.
+        Внимание: при изменении города все существующие пользовательские переопределения (overrides)
+        и кастомные зоны (custom areas) данной семьи будут безвозвратно удалены.
+      operationId: updateFamilyCity
+      parameters:
+        - name: familyId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - cityId
+              properties:
+                cityId:
+                  type: string
+                  description: Идентификатор нового города (например, "ekb").
+      responses:
+        "204":
+          description: City updated successfully, obsolete overrides purged.
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestProblemDetails"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "403":
+          description: Forbidden (user is not a parent in the family)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "404":
+          description: Family not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+
+  /families/{familyId}/members:
+    get:
+      tags:
+        - Families
+      summary: List family members
+      description: Возвращает id и роль участников семьи.
+      operationId: listFamilyMembers
+      parameters:
+        - name: familyId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Family identifier
+      responses:
+        "200":
+          description: Family members
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetFamilyMembersResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "404":
+          description: Family not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+
+  /families/invite-code:
+    post:
+      tags:
+        - Families
+      summary: Generate family invite code
+      description: |
+        Только для родителя, состоящего в семье.
+        Генерирует одноразовый код для приглашения других пользователей в семью с указанной ролью.
+      operationId: createInviteCode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInviteCodeRequest"
+      responses:
+        "200":
+          description: Invite code created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateInviteCodeResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestProblemDetails"
+        "401":
+          description: Unauthorized or insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "404":
+          description: Family or user not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+
+  /families/join-by-invite:
+    post:
+      tags:
+        - Families
+      summary: Join family using invite code
+      description: |
+        По валидному одноразовому коду сервер создаёт запись FamilyMember и добавляет пользователя в семью.
+        Если userRole не совпадает с ролью, для которой создан inviteCode, добавление не происходит.
+      operationId: joinFamilyByInviteCode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JoinFamilyByInviteCodeRequest"
+      responses:
+        "200":
+          description: Successfully joined family
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JoinFamilyByInviteCodeResponse"
+        "400":
+          description: Validation error (e.g. code expired, user already in family)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestProblemDetails"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "404":
+          description: Invite code or family not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+
+  /maps/tiles/{cityId}/{z}/{x}/{y}.pbf:
+    get:
+      tags:
+        - Maps
+      summary: Get vector tile of safety zones (MVT) for a city
+      description: |
+        Возвращает бинарный векторный тайл Mapbox Vector Tile (.pbf), содержащий зоны безопасности для указанного города.
+        Доступно только для масштабов (zoom) от 12 до 18.
+        Данный URL зависит только от города и версии, что позволяет кэшировать тайлы на уровне CDN для всех пользователей города.
+      operationId: getMapTile
+      parameters:
+        - name: cityId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Идентификатор города (например, "ekb").
+        - name: z
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Zoom level (12-18)
+        - name: x
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Tile X coordinate
+        - name: y
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Tile Y coordinate
+        - name: v
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Версия генерации карты (кэш-бастер). Получается из эндпоинта метаданных города.
+      responses:
+        "200":
+          description: Vector tile data (.pbf). Для пустых тайлов возвращается пустой массив байт (0 байт).
+          content:
+            application/vnd.mapbox-vector-tile:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestProblemDetails"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+
+  /maps/cities:
+    get:
+      tags:
+        - Maps
+      summary: Get supported map cities
+      description: Returns cities for which vector tile maps are available.
+      operationId: getMapCities
+      responses:
+        "200":
+          description: Supported cities
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MapCitiesResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+
+  /maps/cities/{cityId}/metadata:
+    get:
+      tags:
+        - Maps
+      summary: Get city map metadata (version/bbox)
+      description: Возвращает метаданные города, включая версию последней генерации карты (generationVersion) для сброса кэша MVT на клиенте.
+      operationId: getCityMetadata
+      parameters:
+        - name: cityId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Идентификатор города.
+      responses:
+        "200":
+          description: City metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - cityId
+                  - generationVersion
+                properties:
+                  cityId:
+                    type: string
+                  generationVersion:
+                    type: string
+                    description: Таймстемп или хеш версии последней перегенерации базовой карты.
+                  bbox:
+                    type: string
+                    description: Bounding Box города в формате minLon,minLat,maxLon,maxLat.
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "404":
+          description: City not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+
+  /maps/user-areas:
+    get:
+      tags:
+        - Maps
+      summary: Get family user risk areas
+      description: Returns raw family user map rows: base-area overrides and custom polygons.
+      operationId: getUserMapAreas
+      parameters:
+        - name: familyId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: childId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: If omitted, returns family-wide areas.
+      responses:
+        "200":
+          description: User risk areas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserMapAreaFeatureCollection"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "404":
+          description: Family not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+  /maps/user-areas/base-overrides:
+    post:
+      tags:
+        - Maps
+      summary: Override risk for a generated base area
+      description: |
+        Creates or updates a family/child risk-only override for a generated base polygon.
+        Do not send geometry here; use baseAreaKey from map area properties.
+      operationId: createBaseAreaOverride
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBaseAreaOverrideRequest"
+      responses:
+        "201":
+          description: Base-area override created or updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserMapAreaFeature"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestProblemDetails"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "403":
+          description: User is not allowed to edit this family map
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "404":
+          description: Family or base map area not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+
+  /maps/user-areas/custom:
+    post:
+      tags:
+        - Maps
+      summary: Create a custom family user risk polygon
+      description: Creates a custom polygon drawn by a parent. Custom polygons have priority over base areas and overrides.
+      operationId: createCustomUserMapArea
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCustomUserMapAreaRequest"
+      responses:
+        "201":
+          description: Custom user risk area created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserMapAreaFeature"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestProblemDetails"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "403":
+          description: User is not allowed to edit this family map
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "404":
+          description: Family not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+
+  /tracking/location:
+    post:
+      tags:
+        - Tracking
+      summary: Submit current child location
+      description: |
+        Updates the current child location, resolves the effective risk level
+        using user areas first and base map areas second, and prepares data for
+        parent map display and scoring.
+      operationId: submitChildLocation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitLocationRequest"
+      responses:
+        "200":
+          description: Location accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmitLocationResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestProblemDetails"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+
+  /tracking/children/{childId}/location:
+    get:
+      tags:
+        - Tracking
+      summary: Get current child location
+      operationId: getChildLocation
+      parameters:
+        - name: childId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Current child location
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChildLocationResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "404":
+          description: Location not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+
+  /tracking/children/{childId}/stats:
+    get:
+      tags:
+        - Tracking
+      summary: Get child score and rating
+      operationId: getChildStats
+      parameters:
+        - name: childId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Child stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChildStatsResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "404":
+          description: Child stats not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ProblemDetails:
+      type: object
+      description: RFC 9457 problem details (ASP.NET Core output)
+      properties:
+        type:
+          type: string
+          nullable: true
+        title:
+          type: string
+          nullable: true
+        status:
+          type: integer
+          nullable: true
+        detail:
+          type: string
+          nullable: true
+        instance:
+          type: string
+          nullable: true
+        traceId:
+          type: string
+          nullable: true
+          description: Request trace identifier added by ASP.NET Core.
+
+    ValidationProblemDetails:
+      allOf:
+        - $ref: "#/components/schemas/ProblemDetails"
+        - type: object
+          description: Problem details for automatic model validation errors.
+          properties:
+            errors:
+              type: object
+              additionalProperties:
+                type: array
+                items:
+                  type: string
+              description: Validation messages grouped by field name.
+
+    BadRequestProblemDetails:
+      oneOf:
+        - $ref: "#/components/schemas/ProblemDetails"
+        - $ref: "#/components/schemas/ValidationProblemDetails"
+      description: Business validation errors use ProblemDetails; automatic model validation errors use ValidationProblemDetails.
+
+    RegisterRequest:
+      type: object
+      required:
+        - login
+        - password
+      properties:
+        login:
+          type: string
+          description: Email или телефон.
+        password:
+          type: string
+          format: password
+
+    LoginRequest:
+      type: object
+      required:
+        - login
+        - password
+      properties:
+        login:
+          type: string
+          description: Email или телефон.
+        password:
+          type: string
+          format: password
+
+    RefreshTokensRequest:
+      type: object
+      required:
+        - refreshToken
+      properties:
+        refreshToken:
+          type: string
+
+    LogOutRequest:
+      type: object
+      required:
+        - refreshToken
+      properties:
+        refreshToken:
+          type: string
+
+    AuthResponse:
+      type: object
+      required:
+        - userId
+        - accessToken
+        - accessTokenExpiresAt
+        - refreshToken
+        - refreshTokenExpiresAt
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: Unique identifier of the authenticated user.
+        accessToken:
+          type: string
+        accessTokenExpiresAt:
+          type: string
+          format: date-time
+          description: Absolute expiration time of the access token.
+        refreshToken:
+          type: string
+        refreshTokenExpiresAt:
+          type: string
+          format: date-time
+          description: Absolute expiration time of the refresh token.
+
+    RefreshTokensResponse:
+      type: object
+      required:
+        - accessToken
+        - accessTokenExpiresAt
+        - refreshToken
+        - refreshTokenExpiresAt
+      properties:
+        accessToken:
+          type: string
+        accessTokenExpiresAt:
+          type: string
+          format: date-time
+        refreshToken:
+          type: string
+        refreshTokenExpiresAt:
+          type: string
+          format: date-time
+
+    UserResponse:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+          nullable: true
+        phoneNumber:
+          type: string
+          nullable: true
+          example: "+79991234567"
+        firstName:
+          type: string
+          nullable: true
+        lastName:
+          type: string
+          nullable: true
+        patronymic:
+          type: string
+          nullable: true
+        birthDate:
+          type: string
+          format: date
+          nullable: true
+        familyId:
+          type: string
+          format: uuid
+          nullable: true
+        familyRole:
+          type: string
+          nullable: true
+          enum:
+            - Parent
+            - Child
+          description: Role of the current user within the family, null when the user has no family.
+
+    CreateFamilyRequest:
+      type: object
+      required:
+        - cityId
+      properties:
+        name:
+          type: string
+          nullable: true
+          description: Название семьи (опционально).
+        cityId:
+          type: string
+          description: Идентификатор города семьи (например, "ekb").
+
+    CreateFamilyResponse:
+      type: object
+      required:
+        - familyId
+        - createdByUserId
+      properties:
+        familyId:
+          type: string
+          format: uuid
+        createdByUserId:
+          type: string
+          format: uuid
+
+    GetFamilyMembersResponse:
+      type: object
+      required:
+        - members
+      properties:
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/MemberDto"
+
+    MemberDto:
+      type: object
+      required:
+        - id
+        - role
+      properties:
+        id:
+          type: string
+          format: uuid
+        role:
+          type: string
+          description: Роль участника в семье (Parent, Child).
+
+    CreateInviteCodeRequest:
+      type: object
+      required:
+        - inviteCodeRole
+      properties:
+        inviteCodeRole:
+          type: string
+          enum:
+            - Parent
+            - Child
+          description: Роль, для которой создаётся код (Parent или Child).
+
+    CreateInviteCodeResponse:
+      type: object
+      required:
+        - inviteCode
+      properties:
+        inviteCode:
+          type: string
+          description: Одноразовый код приглашения.
+
+    JoinFamilyByInviteCodeRequest:
+      type: object
+      required:
+        - inviteCode
+        - userRole
+      properties:
+        inviteCode:
+          type: string
+        userRole:
+          type: string
+          enum:
+            - Parent
+            - Child
+          description: Роль пользователя, которая должна совпадать с ролью inviteCode.
+
+    JoinFamilyByInviteCodeResponse:
+      type: object
+      required:
+        - userId
+        - familyId
+        - role
+      properties:
+        userId:
+          type: string
+          format: uuid
+        familyId:
+          type: string
+          format: uuid
+        role:
+          type: string
+          description: Роль, присвоенная пользователю в семье.
+
+    RiskLevel:
+      type: string
+      enum:
+        - green
+        - yellow
+        - red
+      description: Semantic risk level. The client decides how to render colors.
+
+    GeoJsonGeometry:
+      type: object
+      description: GeoJSON geometry object in WGS84.
+      required:
+        - type
+        - coordinates
+      properties:
+        type:
+          type: string
+          enum:
+            - Point
+            - LineString
+            - Polygon
+            - MultiPolygon
+        coordinates:
+          description: GeoJSON coordinates.
+
+    MapCityBbox:
+      type: object
+      required:
+        - minLon
+        - minLat
+        - maxLon
+        - maxLat
+      properties:
+        minLon:
+          type: number
+          format: double
+        minLat:
+          type: number
+          format: double
+        maxLon:
+          type: number
+          format: double
+        maxLat:
+          type: number
+          format: double
+
+    MapCity:
+      type: object
+      required:
+        - cityId
+        - name
+      properties:
+        cityId:
+          type: string
+          example: ekb
+        name:
+          type: string
+          example: Екатеринбург
+        bbox:
+          nullable: true
+          $ref: "#/components/schemas/MapCityBbox"
+
+    MapCitiesResponse:
+      type: object
+      required:
+        - cities
+      properties:
+        cities:
+          type: array
+          items:
+            $ref: "#/components/schemas/MapCity"
+
+    UserMapAreaProperties:
+      type: object
+      required:
+        - id
+        - familyId
+        - risk
+        - source
+        - renderPriority
+      properties:
+        id:
+          type: string
+          format: uuid
+        familyId:
+          type: string
+          format: uuid
+        childId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Null means the area applies to all children in the family.
+        baseAreaKey:
+          type: string
+          nullable: true
+          description: Set for base-area overrides; null for custom polygons.
+        risk:
+          $ref: "#/components/schemas/RiskLevel"
+        source:
+          type: string
+          enum:
+            - override
+            - custom
+        renderPriority:
+          type: integer
+          description: 0=green, 1=red, 2=yellow, 3=custom.
+        createdByUserId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    UserMapAreaFeature:
+      type: object
+      required:
+        - type
+        - properties
+      properties:
+        type:
+          type: string
+          const: Feature
+        geometry:
+          $ref: "#/components/schemas/GeoJsonGeometry"
+          nullable: true
+          description: Null for base-area overrides; polygon for custom areas.
+        properties:
+          $ref: "#/components/schemas/UserMapAreaProperties"
+
+    UserMapAreaFeatureCollection:
+      type: object
+      required:
+        - type
+        - features
+      properties:
+        type:
+          type: string
+          const: FeatureCollection
+        features:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserMapAreaFeature"
+
+    CreateBaseAreaOverrideRequest:
+      type: object
+      required:
+        - familyId
+        - baseAreaKey
+        - risk
+      properties:
+        familyId:
+          type: string
+          format: uuid
+        childId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Null means the override applies to all children in the family.
+        baseAreaKey:
+          type: string
+          description: Stable base_area_key property from the safety_zones vector tile layer.
+        risk:
+          $ref: "#/components/schemas/RiskLevel"
+
+    CreateCustomUserMapAreaRequest:
+      type: object
+      required:
+        - familyId
+        - risk
+        - geometry
+      properties:
+        familyId:
+          type: string
+          format: uuid
+        childId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Null means the area applies to all children in the family.
+        risk:
+          $ref: "#/components/schemas/RiskLevel"
+        geometry:
+          $ref: "#/components/schemas/GeoJsonGeometry"
+
+    SubmitLocationRequest:
+      type: object
+      required:
+        - latitude
+        - longitude
+      properties:
+        childId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Optional for child clients; defaults to the authenticated user.
+        latitude:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+        accuracyMeters:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
+        recordedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Client-side timestamp. Server time is used when omitted.
+
+    SubmitLocationResponse:
+      type: object
+      required:
+        - childId
+        - currentRisk
+        - lastUpdatedAt
+      properties:
+        childId:
+          type: string
+          format: uuid
+        currentRisk:
+          $ref: "#/components/schemas/RiskLevel"
+        matchedUserAreaId:
+          type: string
+          format: uuid
+          nullable: true
+        matchedBaseAreaId:
+          type: string
+          format: uuid
+          nullable: true
+        lastUpdatedAt:
+          type: string
+          format: date-time
+
+    ChildLocationResponse:
+      type: object
+      required:
+        - childId
+        - latitude
+        - longitude
+        - currentRisk
+        - lastUpdatedAt
+      properties:
+        childId:
+          type: string
+          format: uuid
+        latitude:
+          type: number
+          format: double
+        longitude:
+          type: number
+          format: double
+        accuracyMeters:
+          type: number
+          format: double
+          nullable: true
+        currentRisk:
+          $ref: "#/components/schemas/RiskLevel"
+        lastUpdatedAt:
+          type: string
+          format: date-time
+
+    ChildStatsResponse:
+      type: object
+      required:
+        - childId
+        - totalScore
+        - rating
+      properties:
+        childId:
+          type: string
+          format: uuid
+        totalScore:
+          type: integer
+          format: int32
+        rating:
+          type: integer
+          format: int32

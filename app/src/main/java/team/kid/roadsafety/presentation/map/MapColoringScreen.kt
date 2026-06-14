@@ -25,6 +25,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,21 +36,28 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.camera.rememberCameraState
+import org.maplibre.compose.expressions.ast.Expression
+import org.maplibre.compose.expressions.dsl.asString
+import org.maplibre.compose.expressions.dsl.case
 import org.maplibre.compose.expressions.dsl.const
-import org.maplibre.compose.expressions.dsl.convertToColor
 import org.maplibre.compose.expressions.dsl.feature
+import org.maplibre.compose.expressions.dsl.switch
+import org.maplibre.compose.expressions.value.ColorValue
+import org.maplibre.compose.layers.CircleLayer
 import org.maplibre.compose.layers.FillLayer
-import org.maplibre.compose.layers.LineLayer
 import org.maplibre.compose.map.MaplibreMap
 import org.maplibre.compose.sources.GeoJsonData
+import org.maplibre.compose.sources.TileSetOptions
 import org.maplibre.compose.sources.rememberGeoJsonSource
+import org.maplibre.compose.sources.rememberVectorSource
 import org.maplibre.compose.style.BaseStyle
 import org.maplibre.compose.util.ClickResult
 import org.maplibre.spatialk.geojson.FeatureCollection
-import org.maplibre.spatialk.geojson.Polygon
+import org.maplibre.spatialk.geojson.Point
 import org.maplibre.spatialk.geojson.Position
 import team.kid.roadsafety.domain.aggregates.map.MapAreaColor
 import org.maplibre.spatialk.geojson.Feature as GeoJsonFeature
@@ -62,24 +70,31 @@ fun MapColoringScreen(
     val state by viewModel.uiState.collectAsState()
     val cameraState = rememberCameraState(
         firstPosition = CameraPosition(
-            target = Position(37.6173, 55.7558),
+            target = Position(60.6122, 56.8519),
             zoom = 12.0
         )
     )
 
-    val featureCollection = remember(state.areas) {
-        val features = state.areas.map { area ->
-            val polygon = Polygon(listOf(area.points.map { Position(it.longitude, it.latitude) }))
-            val colorHex = when (area.color) {
-                MapAreaColor.GREEN -> "#4CAF50"
-                MapAreaColor.YELLOW -> "#FFEB3B"
-                MapAreaColor.RED -> "#F44336"
-                MapAreaColor.NONE -> "#BDBDBD"
-            }
-            val properties = JsonObject(mapOf("color" to JsonPrimitive(colorHex)))
-            GeoJsonFeature(polygon, properties, JsonPrimitive(area.id.value.toString()))
+    val currentLocationSource = remember(state.currentLocation) {
+        if (state.currentLocation != null) {
+            val point = Point(
+                Position(state.currentLocation!!.longitude, state.currentLocation!!.latitude)
+            )
+            FeatureCollection(listOf(GeoJsonFeature(point, JsonObject(emptyMap()), null)))
+        } else {
+            FeatureCollection(emptyList<GeoJsonFeature<Point, JsonObject>>())
         }
-        FeatureCollection(features)
+    }
+
+    val hasCentered = remember { mutableStateOf(false) }
+    LaunchedEffect(state.currentLocation) {
+        if (!hasCentered.value && state.currentLocation != null) {
+            cameraState.position = CameraPosition(
+                target = Position(state.currentLocation!!.longitude, state.currentLocation!!.latitude),
+                zoom = 15.0
+            )
+            hasCentered.value = true
+        }
     }
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -88,43 +103,57 @@ fun MapColoringScreen(
             baseStyle = BaseStyle.Uri("https://tiles.openfreemap.org/styles/bright"),
             cameraState = cameraState
         ) {
-            if (featureCollection.features.isNotEmpty()) {
-                key(state.areas) {
-                    val geoJsonSource = rememberGeoJsonSource(
-                        data = GeoJsonData.Features(featureCollection)
+            state.tileUrl?.let { tileUrl ->
+                key(tileUrl, state.overrides) {
+                    val vectorSource = rememberVectorSource(
+                        tiles = listOf(tileUrl),
+                        options = TileSetOptions(minZoom = 12, maxZoom = 18)
                     )
 
                     FillLayer(
-                        id = "blocks-fill",
-                        source = geoJsonSource,
-                        color = feature["color"].convertToColor(),
-                        opacity = const(0.4f),
+                        id = "safety-zones-layer",
+                        source = vectorSource,
+                        sourceLayer = "safety_zones",
+                        minZoom = 12f,
+                        maxZoom = 18f,
+                        color = safetyZoneColorExpression(state.overrides),
+                        opacity = const(0.35f),
                         onClick = { clickedFeatures ->
-                            val clickedFeature = clickedFeatures.firstOrNull()
-                            val id = clickedFeature?.id?.jsonPrimitive?.content
-                            if (id != null) {
-                                val area = state.areas.find { it.id.value.toString() == id }
-                                if (area != null) {
-                                    viewModel.onAreaClicked(area)
-                                }
+                            val baseAreaKey = clickedFeatures
+                                .firstOrNull()
+                                ?.properties
+                                ?.get("base_area_key")
+                                ?.jsonPrimitive
+                                ?.contentOrNull
+
+                            if (baseAreaKey != null) {
+                                viewModel.onBaseAreaClicked(baseAreaKey)
                                 ClickResult.Consume
                             } else {
                                 ClickResult.Pass
                             }
                         }
                     )
+                }
+            }
 
-                    LineLayer(
-                        id = "blocks-outline",
-                        source = geoJsonSource,
-                        color = const(Color.Black),
-                        width = const(1.dp)
+            if (state.currentLocation != null) {
+                key(state.currentLocation) {
+                    val locationGeoJsonSource = rememberGeoJsonSource(
+                        data = GeoJsonData.Features(currentLocationSource)
+                    )
+                    CircleLayer(
+                        id = "current-location-marker",
+                        source = locationGeoJsonSource,
+                        color = const(Color.Blue),
+                        radius = const(8.dp),
+                        strokeColor = const(Color.White),
+                        strokeWidth = const(2.dp)
                     )
                 }
             }
         }
 
-        // Side Paint Panel
         PaintPanel(
             selectedColor = state.activePaintColor,
             onColorSelected = viewModel::onPaintColorSelected,
@@ -138,7 +167,7 @@ fun MapColoringScreen(
                 modifier = Modifier.align(Alignment.Center)
             )
         }
-        
+
         state.error?.let { errorMsg ->
             LaunchedEffect(errorMsg) {
                 delay(3000)
@@ -153,6 +182,39 @@ fun MapColoringScreen(
             }
         }
     }
+}
+
+private fun safetyZoneColorExpression(
+    overrides: Map<String, MapAreaColor>
+): Expression<ColorValue> {
+    val baseRiskColor = switch(
+        input = feature["risk"].asString(),
+        case("green", const(Color(0xFF4CAF50))),
+        case("yellow", const(Color(0xFFFFEB3B))),
+        case("red", const(Color(0xFFF44336))),
+        fallback = const(Color(0xFFBDBDBD))
+    )
+
+    if (overrides.isEmpty()) {
+        return baseRiskColor
+    }
+
+    val overrideCases = overrides.map { (baseAreaKey, color) ->
+        case(baseAreaKey, const(color.toComposeColor()))
+    }.toTypedArray()
+
+    return switch(
+        input = feature["base_area_key"].asString(),
+        cases = overrideCases,
+        fallback = baseRiskColor
+    )
+}
+
+private fun MapAreaColor.toComposeColor(): Color = when (this) {
+    MapAreaColor.GREEN -> Color(0xFF4CAF50)
+    MapAreaColor.YELLOW -> Color(0xFFFFEB3B)
+    MapAreaColor.RED -> Color(0xFFF44336)
+    MapAreaColor.NONE -> Color(0xFF4CAF50)
 }
 
 @Composable
@@ -171,7 +233,6 @@ fun PaintPanel(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Colors
             listOf(
                 MapAreaColor.RED to Color(0xFFF44336),
                 MapAreaColor.YELLOW to Color(0xFFFFEB3B),
@@ -189,7 +250,7 @@ fun PaintPanel(
                             color = if (isSelected) Color.White else Color.Transparent,
                             shape = CircleShape
                         )
-                        .clickable { 
+                        .clickable {
                             if (isSelected) onColorSelected(null)
                             else onColorSelected(domainColor)
                         },
@@ -203,23 +264,22 @@ fun PaintPanel(
 
             HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))
 
-            // Tool Switch (Selection mode)
             FilledIconButton(
                 onClick = { onColorSelected(null) },
                 modifier = Modifier.size(40.dp),
                 colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = if (selectedColor == null) 
-                        MaterialTheme.colorScheme.primaryContainer 
-                    else 
+                    containerColor = if (selectedColor == null)
+                        MaterialTheme.colorScheme.primaryContainer
+                    else
                         MaterialTheme.colorScheme.surfaceVariant
                 )
             ) {
                 Text(
-                    "OFF", 
+                    "OFF",
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (selectedColor == null) 
-                        MaterialTheme.colorScheme.onPrimaryContainer 
-                    else 
+                    color = if (selectedColor == null)
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    else
                         MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }

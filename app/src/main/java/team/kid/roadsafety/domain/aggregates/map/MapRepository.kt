@@ -3,7 +3,8 @@ package team.kid.roadsafety.domain.aggregates.map
 import team.kid.roadsafety.domain.UserId
 
 interface MapRepository {
-    suspend fun getAreas(cityId: String? = null): Result<List<MapArea>>
     suspend fun getUserAreas(familyId: String, childId: UserId? = null): Result<List<MapArea>>
-    suspend fun updateAreaColor(areaId: String, color: MapAreaColor, childId: UserId? = null): Result<Unit>
+    suspend fun getCityMetadata(cityId: String): Result<MapCityMetadata>
+    suspend fun updateAreaColor(area: MapArea, familyId: String, color: MapAreaColor, childId: UserId? = null): Result<Unit>
+    suspend fun updateBaseAreaColor(baseAreaKey: String, familyId: String, color: MapAreaColor, childId: UserId? = null): Result<Unit>
 }

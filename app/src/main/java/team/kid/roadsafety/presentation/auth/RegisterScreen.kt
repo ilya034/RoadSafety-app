@@ -38,7 +38,6 @@ fun RegisterScreen(
     var isAgreed by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
 
-    // Validation logic for the button
     val isFormValid = state.login.isNotBlank() && 
                       state.password.length >= 8 && 
                       isAgreed

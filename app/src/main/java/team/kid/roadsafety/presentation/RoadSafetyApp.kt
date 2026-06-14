@@ -23,6 +23,8 @@ import team.kid.roadsafety.presentation.auth.AuthNavigation
 import team.kid.roadsafety.presentation.family.FamilyOnboardingScreen
 import team.kid.roadsafety.presentation.map.MapColoringScreen
 import team.kid.roadsafety.presentation.profile.ProfileScreen
+import team.kid.roadsafety.infrastructure.location.LocationPermissionHelper
+import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun RoadSafetyApp(viewModel: MainViewModel = hiltViewModel()) {
@@ -35,7 +37,18 @@ fun RoadSafetyApp(viewModel: MainViewModel = hiltViewModel()) {
             }
         }
         is AuthState.Authenticated -> {
-            MainScreen(onLogout = viewModel::logout)
+            val isChild by viewModel.isChild.collectAsState()
+            val context = LocalContext.current
+            
+            if (isChild) {
+                LocationPermissionHelper(
+                    onPermissionsGranted = {
+                        viewModel.startLocationService(context)
+                    }
+                )
+            }
+            
+            MainScreen(onLogout = { viewModel.logout(context) })
         }
         is AuthState.AuthenticatedButNoFamily -> {
             FamilyOnboardingScreen(onSuccess = viewModel::onAuthSuccess)

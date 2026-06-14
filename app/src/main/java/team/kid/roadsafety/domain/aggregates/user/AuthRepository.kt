@@ -10,10 +10,7 @@ interface AuthRepository {
     
     suspend fun register(
         login: String,
-        password: String,
-        firstName: String?,
-        lastName: String?,
-        birthDate: LocalDate?
+        password: String
     ): Result<AuthResponseDto>
 
     suspend fun getCurrentUser(): Result<UserResponseDto>
