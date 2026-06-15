@@ -26,7 +26,7 @@ android {
 
     buildTypes {
         debug {
-            buildConfigField("String", "BASE_URL", "\"http://192.168.31.110:5103/api/\"")
+            buildConfigField("String", "BASE_URL", "\"https://roadsafety.my.to/api/\"")
         }
         release {
             isMinifyEnabled = false
@@ -34,7 +34,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            buildConfigField("String", "BASE_URL", "\"https://api.roadsafety.local/v1/\"")
+            buildConfigField("String", "BASE_URL", "\"https://roadsafety.my.to/api/\"")
         }
     }
     compileOptions {

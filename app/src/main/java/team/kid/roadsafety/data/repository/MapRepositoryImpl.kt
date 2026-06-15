@@ -1,6 +1,7 @@
 package team.kid.roadsafety.data.repository
 
 import team.kid.roadsafety.data.remote.RoadSafetyApi
+import team.kid.roadsafety.data.local.MapCacheLocalDataSource
 import team.kid.roadsafety.domain.AreaId
 import team.kid.roadsafety.domain.CityId
 import team.kid.roadsafety.domain.UserId
@@ -15,19 +16,35 @@ import java.util.UUID
 import javax.inject.Inject
 
 class MapRepositoryImpl @Inject constructor(
-    private val api: RoadSafetyApi
+    private val api: RoadSafetyApi,
+    private val cache: MapCacheLocalDataSource
 ) : MapRepository {
+
+    override fun getCachedUserAreas(familyId: String, childId: UserId?): List<MapArea>? {
+        return cache.getUserAreas(familyId, childId?.value?.toString())
+            ?.features
+            ?.map { it.toMapArea() }
+    }
+
+    override fun getCachedCityMetadata(cityId: String): MapCityMetadata? {
+        return cache.getCityMetadata(cityId)?.toDomain()
+    }
 
     override suspend fun getUserAreas(familyId: String, childId: UserId?): Result<List<MapArea>> {
         return try {
             val response = api.getUserAreas(familyId, childId?.value?.toString())
             if (response.isSuccessful) {
-                Result.success(response.body()?.features?.map { it.toMapArea() } ?: emptyList())
+                val body = response.body()
+                if (body != null) {
+                    cache.saveUserAreas(familyId, childId?.value?.toString(), body)
+                }
+                Result.success(body?.features?.map { it.toMapArea() } ?: emptyList())
             } else {
-                Result.failure(Exception(response.parseErrorMessage("Failed to fetch user areas")))
+                cachedUserAreas(familyId, childId)
+                    ?: Result.failure(Exception(response.parseErrorMessage("Failed to fetch user areas")))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            cachedUserAreas(familyId, childId) ?: Result.failure(e)
         }
     }
 
@@ -36,25 +53,14 @@ class MapRepositoryImpl @Inject constructor(
             val response = api.getCityMetadata(cityId)
             if (response.isSuccessful) {
                 val body = response.body() ?: return Result.failure(Exception("City metadata response is empty"))
-                Result.success(
-                    MapCityMetadata(
-                        cityId = body.cityId,
-                        generationVersion = body.generationVersion,
-                        bbox = body.bbox?.let {
-                            MapCityBbox(
-                                minLon = it.minLon,
-                                minLat = it.minLat,
-                                maxLon = it.maxLon,
-                                maxLat = it.maxLat
-                            )
-                        }
-                    )
-                )
+                cache.saveCityMetadata(cityId, body)
+                Result.success(body.toDomain())
             } else {
-                Result.failure(Exception(response.parseErrorMessage("Failed to fetch city metadata")))
+                cachedCityMetadata(cityId)
+                    ?: Result.failure(Exception(response.parseErrorMessage("Failed to fetch city metadata")))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            cachedCityMetadata(cityId) ?: Result.failure(e)
         }
     }
 
@@ -108,6 +114,32 @@ class MapRepositoryImpl @Inject constructor(
             color = MapAreaColor.fromString(properties.risk.name),
             points = points,
             cityId = null
+        )
+    }
+
+    private fun cachedUserAreas(familyId: String, childId: UserId?): Result<List<MapArea>>? {
+        return cache.getUserAreas(familyId, childId?.value?.toString())
+            ?.features
+            ?.map { it.toMapArea() }
+            ?.let { Result.success(it) }
+    }
+
+    private fun cachedCityMetadata(cityId: String): Result<MapCityMetadata>? {
+        return cache.getCityMetadata(cityId)?.toDomain()?.let { Result.success(it) }
+    }
+
+    private fun team.kid.roadsafety.data.dto.MapCityMetadataDto.toDomain(): MapCityMetadata {
+        return MapCityMetadata(
+            cityId = cityId,
+            generationVersion = generationVersion,
+            bbox = bbox?.let {
+                MapCityBbox(
+                    minLon = it.minLon,
+                    minLat = it.minLat,
+                    maxLon = it.maxLon,
+                    maxLat = it.maxLat
+                )
+            }
         )
     }
 }

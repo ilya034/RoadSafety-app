@@ -7,6 +7,7 @@ import team.kid.roadsafety.data.dto.CreateInviteCodeRequestDto
 import team.kid.roadsafety.data.dto.JoinFamilyByInviteCodeRequestDto
 import team.kid.roadsafety.data.dto.MapCityDto
 import team.kid.roadsafety.data.dto.UpdateFamilyCityRequestDto
+import team.kid.roadsafety.data.local.MapCacheLocalDataSource
 import team.kid.roadsafety.data.remote.RoadSafetyApi
 import team.kid.roadsafety.domain.FamilyId
 import team.kid.roadsafety.domain.aggregates.family.FamilyEntity
@@ -21,6 +22,7 @@ import javax.inject.Inject
 
 class FamilyRepositoryImpl @Inject constructor(
     private val api: RoadSafetyApi,
+    private val mapCache: MapCacheLocalDataSource,
     @ApplicationContext context: Context
 ) : FamilyRepository {
 
@@ -51,12 +53,16 @@ class FamilyRepositoryImpl @Inject constructor(
         return try {
             val response = api.getMapCities()
             if (response.isSuccessful) {
-                Result.success(response.body()?.cities?.map { it.toDomain() } ?: fallbackCities)
+                val body = response.body()
+                if (body != null) {
+                    mapCache.saveCities(body)
+                }
+                Result.success(body?.cities?.map { it.toDomain() } ?: cachedCities())
             } else {
-                Result.success(fallbackCities)
+                Result.success(cachedCities())
             }
         } catch (e: Exception) {
-            Result.success(fallbackCities)
+            Result.success(cachedCities())
         }
     }
 
@@ -167,6 +173,10 @@ class FamilyRepositoryImpl @Inject constructor(
                 )
             }
         )
+    }
+
+    private fun cachedCities(): List<MapCity> {
+        return mapCache.getCities()?.cities?.map { it.toDomain() } ?: fallbackCities
     }
 
     private companion object {

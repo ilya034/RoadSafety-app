@@ -456,6 +456,7 @@ paths:
         Доступно только для масштабов (zoom) от 12 до 18.
         Данный URL зависит только от города и версии, что позволяет кэшировать тайлы на уровне CDN для всех пользователей города.
       operationId: getMapTile
+      security: []
       parameters:
         - name: cityId
           in: path
@@ -501,12 +502,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BadRequestProblemDetails"
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetails"
 
   /maps/cities:
     get:
@@ -515,6 +510,7 @@ paths:
       summary: Get supported map cities
       description: Returns cities for which vector tile maps are available.
       operationId: getMapCities
+      security: []
       responses:
         "200":
           description: Supported cities
@@ -522,12 +518,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MapCitiesResponse"
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetails"
 
   /maps/cities/{cityId}/metadata:
     get:
@@ -536,6 +526,7 @@ paths:
       summary: Get city map metadata (version/bbox)
       description: Возвращает метаданные города, включая версию последней генерации карты (generationVersion) для сброса кэша MVT на клиенте.
       operationId: getCityMetadata
+      security: []
       parameters:
         - name: cityId
           in: path
@@ -560,14 +551,7 @@ paths:
                     type: string
                     description: Таймстемп или хеш версии последней перегенерации базовой карты.
                   bbox:
-                    type: string
-                    description: Bounding Box города в формате minLon,minLat,maxLon,maxLat.
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetails"
+                    $ref: "#/components/schemas/MapCityBbox"
         "404":
           description: City not found
           content:

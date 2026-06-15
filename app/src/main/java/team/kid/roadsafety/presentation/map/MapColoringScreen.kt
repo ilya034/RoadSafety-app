@@ -14,6 +14,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButtonDefaults
@@ -27,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,15 +38,14 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.camera.rememberCameraState
 import org.maplibre.compose.expressions.ast.Expression
-import org.maplibre.compose.expressions.dsl.asString
 import org.maplibre.compose.expressions.dsl.case
 import org.maplibre.compose.expressions.dsl.const
+import org.maplibre.compose.expressions.dsl.convertToString
 import org.maplibre.compose.expressions.dsl.feature
 import org.maplibre.compose.expressions.dsl.switch
 import org.maplibre.compose.expressions.value.ColorValue
@@ -60,6 +62,8 @@ import org.maplibre.spatialk.geojson.FeatureCollection
 import org.maplibre.spatialk.geojson.Point
 import org.maplibre.spatialk.geojson.Position
 import team.kid.roadsafety.domain.aggregates.map.MapAreaColor
+import team.kid.roadsafety.domain.aggregates.map.MapCity
+import team.kid.roadsafety.domain.aggregates.map.MapCityBbox
 import org.maplibre.spatialk.geojson.Feature as GeoJsonFeature
 
 @Composable
@@ -86,25 +90,25 @@ fun MapColoringScreen(
         }
     }
 
-    val hasCentered = remember { mutableStateOf(false) }
-    LaunchedEffect(state.currentLocation) {
-        if (!hasCentered.value && state.currentLocation != null) {
+    LaunchedEffect(state.activeMapCityId, state.metadata?.bbox, state.cities) {
+        val bbox = state.metadata?.bbox
+            ?: state.cities.firstOrNull { it.cityId == state.activeMapCityId }?.bbox
+        if (bbox != null) {
             cameraState.position = CameraPosition(
-                target = Position(state.currentLocation!!.longitude, state.currentLocation!!.latitude),
-                zoom = 15.0
+                target = bbox.centerPosition(),
+                zoom = bbox.defaultZoom()
             )
-            hasCentered.value = true
         }
     }
 
     Box(modifier = modifier.fillMaxSize()) {
         MaplibreMap(
             modifier = Modifier.fillMaxSize(),
-            baseStyle = BaseStyle.Uri("https://tiles.openfreemap.org/styles/bright"),
+            baseStyle = BaseStyle.Uri(MapBaseStyleUrl),
             cameraState = cameraState
         ) {
             state.tileUrl?.let { tileUrl ->
-                key(tileUrl, state.overrides) {
+                key(tileUrl) {
                     val vectorSource = rememberVectorSource(
                         tiles = listOf(tileUrl),
                         options = TileSetOptions(minZoom = 12, maxZoom = 18)
@@ -122,7 +126,7 @@ fun MapColoringScreen(
                             val baseAreaKey = clickedFeatures
                                 .firstOrNull()
                                 ?.properties
-                                ?.get("base_area_key")
+                                ?.get("baseAreaKey")
                                 ?.jsonPrimitive
                                 ?.contentOrNull
 
@@ -157,9 +161,19 @@ fun MapColoringScreen(
         PaintPanel(
             selectedColor = state.activePaintColor,
             onColorSelected = viewModel::onPaintColorSelected,
+            enabled = state.canEditMap,
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .padding(end = 16.dp)
+        )
+
+        CitySelector(
+            cities = state.cities,
+            activeCityId = state.activeMapCityId,
+            onCitySelected = viewModel::viewCity,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(16.dp)
         )
 
         if (state.isLoading) {
@@ -184,14 +198,16 @@ fun MapColoringScreen(
     }
 }
 
+private const val MapBaseStyleUrl = "https://tiles.openfreemap.org/styles/bright"
+
 private fun safetyZoneColorExpression(
     overrides: Map<String, MapAreaColor>
 ): Expression<ColorValue> {
     val baseRiskColor = switch(
-        input = feature["risk"].asString(),
-        case("green", const(Color(0xFF4CAF50))),
-        case("yellow", const(Color(0xFFFFEB3B))),
-        case("red", const(Color(0xFFF44336))),
+        input = feature["risk"].convertToString(),
+        case(listOf("green", "Green", "GREEN"), const(Color(0xFF4CAF50))),
+        case(listOf("yellow", "Yellow", "YELLOW"), const(Color(0xFFFFEB3B))),
+        case(listOf("red", "Red", "RED"), const(Color(0xFFF44336))),
         fallback = const(Color(0xFFBDBDBD))
     )
 
@@ -204,7 +220,7 @@ private fun safetyZoneColorExpression(
     }.toTypedArray()
 
     return switch(
-        input = feature["base_area_key"].asString(),
+        input = feature["baseAreaKey"].convertToString(),
         cases = overrideCases,
         fallback = baseRiskColor
     )
@@ -217,10 +233,29 @@ private fun MapAreaColor.toComposeColor(): Color = when (this) {
     MapAreaColor.NONE -> Color(0xFF4CAF50)
 }
 
+private fun MapCityBbox.centerPosition(): Position {
+    return Position(
+        longitude = (minLon + maxLon) / 2.0,
+        latitude = (minLat + maxLat) / 2.0
+    )
+}
+
+private fun MapCityBbox.defaultZoom(): Double {
+    val span = maxOf(maxLon - minLon, maxLat - minLat)
+    return when {
+        span <= 0.03 -> 13.0
+        span <= 0.08 -> 12.0
+        span <= 0.2 -> 11.0
+        span <= 0.5 -> 10.0
+        else -> 9.0
+    }
+}
+
 @Composable
 fun PaintPanel(
     selectedColor: MapAreaColor?,
     onColorSelected: (MapAreaColor?) -> Unit,
+    enabled: Boolean,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -237,20 +272,20 @@ fun PaintPanel(
                 MapAreaColor.RED to Color(0xFFF44336),
                 MapAreaColor.YELLOW to Color(0xFFFFEB3B),
                 MapAreaColor.GREEN to Color(0xFF4CAF50),
-                MapAreaColor.NONE to Color(0xFFBDBDBD)
             ).forEach { (domainColor, composeColor) ->
                 val isSelected = selectedColor == domainColor
                 Box(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(CircleShape)
-                        .background(composeColor)
+                        .background(if (enabled) composeColor else composeColor.copy(alpha = 0.35f))
                         .border(
-                            width = if (isSelected) 3.dp else 0.dp,
+                            width = if (enabled && isSelected) 3.dp else 0.dp,
                             color = if (isSelected) Color.White else Color.Transparent,
                             shape = CircleShape
                         )
                         .clickable {
+                            if (!enabled) return@clickable
                             if (isSelected) onColorSelected(null)
                             else onColorSelected(domainColor)
                         },
@@ -265,7 +300,8 @@ fun PaintPanel(
             HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))
 
             FilledIconButton(
-                onClick = { onColorSelected(null) },
+                onClick = { if (enabled) onColorSelected(null) },
+                enabled = enabled,
                 modifier = Modifier.size(40.dp),
                 colors = IconButtonDefaults.filledIconButtonColors(
                     containerColor = if (selectedColor == null)
@@ -275,13 +311,60 @@ fun PaintPanel(
                 )
             ) {
                 Text(
-                    "OFF",
+                    if (enabled) "OFF" else "VIEW",
                     style = MaterialTheme.typography.labelSmall,
                     color = if (selectedColor == null)
                         MaterialTheme.colorScheme.onPrimaryContainer
                     else
                         MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CitySelector(
+    cities: List<MapCity>,
+    activeCityId: String,
+    onCitySelected: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (cities.isEmpty()) return
+
+    var expanded by remember { mutableStateOf(false) }
+    val activeCity = cities.firstOrNull { it.cityId == activeCityId }
+    val label = activeCity?.name ?: activeCityId
+
+    Card(
+        modifier = modifier,
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Box {
+            Text(
+                text = label,
+                modifier = Modifier
+                    .clickable { expanded = true }
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                style = MaterialTheme.typography.bodyMedium
+            )
+
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                cities.forEach { city ->
+                    DropdownMenuItem(
+                        text = {
+                            Text(text = city.name)
+                        },
+                        onClick = {
+                            onCitySelected(city.cityId)
+                            expanded = false
+                        }
+                    )
+                }
             }
         }
     }
