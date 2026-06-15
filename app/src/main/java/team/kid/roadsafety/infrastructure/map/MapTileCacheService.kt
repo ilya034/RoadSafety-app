@@ -223,7 +223,7 @@ class MapTileCacheService @Inject constructor(
     private companion object {
         const val BaseMapMinZoom = 9.0
         const val BaseMapMaxZoom = 18.0
-        const val SafetyTileMinZoom = 12
+        const val SafetyTileMinZoom = 9
         const val SafetyTileMaxZoom = 15
         const val SafetyTileWarmLimit = 400
         const val SafetyTileTtlSeconds = 24L * 60L * 60L

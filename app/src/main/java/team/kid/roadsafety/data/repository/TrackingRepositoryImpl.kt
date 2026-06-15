@@ -32,4 +32,37 @@ class TrackingRepositoryImpl @Inject constructor(
             Result.failure(e)
         }
     }
+
+    override suspend fun getChildrenLocations() = try {
+        val response = api.getChildrenLocations()
+        if (response.isSuccessful) {
+            Result.success(response.body()!!)
+        } else {
+            Result.failure(Exception(response.parseErrorMessage("Failed to load children locations")))
+        }
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
+
+    override suspend fun getNotifications(unreadOnly: Boolean) = try {
+        val response = api.getNotifications(unreadOnly)
+        if (response.isSuccessful) {
+            Result.success(response.body()!!)
+        } else {
+            Result.failure(Exception(response.parseErrorMessage("Failed to load notifications")))
+        }
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
+
+    override suspend fun markNotificationRead(id: String) = try {
+        val response = api.markNotificationRead(id)
+        if (response.isSuccessful) {
+            Result.success(Unit)
+        } else {
+            Result.failure(Exception(response.parseErrorMessage("Failed to mark notification read")))
+        }
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
 }

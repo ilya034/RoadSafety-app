@@ -8,14 +8,18 @@ import java.nio.charset.StandardCharsets
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import team.kid.roadsafety.BuildConfig
 import team.kid.roadsafety.domain.aggregates.family.FamilyRepository
 import team.kid.roadsafety.domain.aggregates.map.GeoPoint
 import team.kid.roadsafety.domain.aggregates.map.MapAreaColor
 import team.kid.roadsafety.domain.aggregates.map.MapCity
+import team.kid.roadsafety.domain.aggregates.map.MapCityBbox
 import team.kid.roadsafety.domain.aggregates.map.MapCityMetadata
 import team.kid.roadsafety.domain.aggregates.map.MapRepository
+import team.kid.roadsafety.domain.aggregates.tracking.TrackingRepository
 import team.kid.roadsafety.domain.aggregates.user.AuthRepository
 import team.kid.roadsafety.infrastructure.NetworkMonitor
 import team.kid.roadsafety.infrastructure.location.LocationObserver
@@ -27,6 +31,7 @@ class MapViewModel @Inject constructor(
     private val mapRepository: MapRepository,
     private val familyRepository: FamilyRepository,
     private val authRepository: AuthRepository,
+    private val trackingRepository: TrackingRepository,
     private val locationObserver: LocationObserver,
     private val networkMonitor: NetworkMonitor,
     private val mapTileCacheService: MapTileCacheService
@@ -35,30 +40,58 @@ class MapViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(MapUiState())
     val uiState = _uiState.asStateFlow()
 
+    private var initializationJob: Job? = null
+    private var childrenLocationPollingJob: Job? = null
+
     init {
-        initializeMap()
         observeLocationUpdates()
     }
 
-    private fun initializeMap() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
+    fun refreshForCurrentUser() {
+        initializationJob?.cancel()
+        initializationJob = viewModelScope.launch {
+            initializeMap()
+        }
+    }
 
-            val userResult = authRepository.getCurrentUser()
-            val familyId = userResult.getOrNull()?.familyId
-            val familyCityId = familyRepository.getSelectedCityId() ?: DefaultCityId
-            val cities = familyRepository.getSupportedCities().getOrDefault(listOf(DefaultCity))
-            val activeCity = cities.firstOrNull { it.cityId == familyCityId } ?: cities.firstOrNull() ?: DefaultCity
+    fun stopScreenWork() {
+        initializationJob?.cancel()
+        initializationJob = null
+        childrenLocationPollingJob?.cancel()
+        childrenLocationPollingJob = null
+    }
 
-            _uiState.update {
-                it.copy(
-                    familyId = familyId,
-                    familyCityId = familyCityId,
-                    activeMapCityId = activeCity.cityId,
-                    cities = cities
-                )
-            }
-            loadCity(activeCity.cityId, familyId)
+    private suspend fun initializeMap() {
+        childrenLocationPollingJob?.cancel()
+        childrenLocationPollingJob = null
+
+        _uiState.update {
+            MapUiState(
+                currentLocation = it.currentLocation,
+                isLoading = true
+            )
+        }
+
+        val userResult = authRepository.getCurrentUser()
+        val currentUser = userResult.getOrNull()
+        val familyId = currentUser?.familyId
+        val isParent = currentUser?.familyRole.equals("Parent", ignoreCase = true)
+        val familyCityId = familyRepository.getSelectedCityId() ?: DefaultCityId
+        val cities = familyRepository.getSupportedCities().getOrDefault(listOf(DefaultCity))
+        val activeCity = cities.firstOrNull { it.cityId == familyCityId } ?: cities.firstOrNull() ?: DefaultCity
+
+        _uiState.update {
+            it.copy(
+                familyId = familyId,
+                isParent = isParent,
+                familyCityId = familyCityId,
+                activeMapCityId = activeCity.cityId,
+                cities = cities
+            )
+        }
+        loadCity(activeCity.cityId, familyId)
+        if (isParent) {
+            startChildrenLocationPolling()
         }
     }
 
@@ -73,17 +106,21 @@ class MapViewModel @Inject constructor(
         val metadataResult = mapRepository.getCityMetadata(cityId)
         metadataResult.fold(
             onSuccess = { metadata ->
+                val configuredBbox = _uiState.value.cities
+                    .firstOrNull { it.cityId == cityId }
+                    ?.bbox
+                val effectiveMetadata = metadata.copy(bbox = metadata.bbox.union(configuredBbox))
                 val tileUrl = buildTileUrl(cityId, metadata.generationVersion)
                 _uiState.update {
                     it.copy(
                         isLoading = false,
                         activeMapCityId = cityId,
-                        metadata = metadata,
+                        metadata = effectiveMetadata,
                         tileUrl = tileUrl,
                         error = null
                     )
                 }
-                refreshTileCache(cityId, metadata, tileUrl)
+                refreshTileCache(cityId, effectiveMetadata, tileUrl)
             },
             onFailure = { error ->
                 val generationVersion = "fallback"
@@ -118,6 +155,40 @@ class MapViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 // Permissions might not be granted. Ignore gracefully.
+            }
+        }
+    }
+
+    private fun startChildrenLocationPolling() {
+        childrenLocationPollingJob?.cancel()
+        childrenLocationPollingJob = viewModelScope.launch {
+            while (true) {
+                trackingRepository.getChildrenLocations()
+                    .fold(
+                        onSuccess = { response ->
+                            _uiState.update {
+                                it.copy(
+                                    childLocations = response.children.map { child ->
+                                        ChildMapLocation(
+                                            childId = child.childId,
+                                            displayName = child.displayName,
+                                            point = GeoPoint(child.latitude, child.longitude),
+                                            currentRisk = child.currentRisk.name,
+                                            lastUpdatedAt = child.lastUpdatedAt
+                                        )
+                                    },
+                                    error = null
+                                )
+                            }
+                        },
+                        onFailure = { error ->
+                            _uiState.update {
+                                it.copy(error = error.message ?: "Failed to load children locations")
+                            }
+                        }
+                    )
+
+                delay(15_000L)
             }
         }
     }
@@ -179,10 +250,14 @@ class MapViewModel @Inject constructor(
     }
 
     fun onPaintColorSelected(color: MapAreaColor?) {
+        if (!_uiState.value.canEditMap) return
+
         _uiState.update { it.copy(activePaintColor = color) }
     }
 
     fun onBaseAreaClicked(baseAreaKey: String) {
+        if (!_uiState.value.canEditMap) return
+
         val paintColor = _uiState.value.activePaintColor ?: return
         updateBaseAreaColor(baseAreaKey, paintColor)
     }
@@ -291,14 +366,39 @@ data class MapUiState(
     val familyCityId: String = "ekb",
     val cities: List<MapCity> = emptyList(),
     val familyId: String? = null,
+    val isParent: Boolean = false,
     val metadata: MapCityMetadata? = null,
     val tileUrl: String? = null,
     val overrides: Map<String, MapAreaColor> = emptyMap(),
     val activePaintColor: MapAreaColor? = null,
     val isLoading: Boolean = false,
     val error: String? = null,
-    val currentLocation: GeoPoint? = null
+    val currentLocation: GeoPoint? = null,
+    val childLocations: List<ChildMapLocation> = emptyList()
 ) {
     val canEditMap: Boolean
-        get() = familyId != null
+        get() = familyId != null && isParent
+}
+
+data class ChildMapLocation(
+    val childId: String,
+    val displayName: String,
+    val point: GeoPoint,
+    val currentRisk: String,
+    val lastUpdatedAt: String
+) {
+    val label: String
+        get() = displayName.ifBlank { "Child ${childId.take(8)}" }
+}
+
+private fun MapCityBbox?.union(other: MapCityBbox?): MapCityBbox? {
+    if (this == null) return other
+    if (other == null) return this
+
+    return MapCityBbox(
+        minLon = minOf(minLon, other.minLon),
+        minLat = minOf(minLat, other.minLat),
+        maxLon = maxOf(maxLon, other.maxLon),
+        maxLat = maxOf(maxLat, other.maxLat)
+    )
 }

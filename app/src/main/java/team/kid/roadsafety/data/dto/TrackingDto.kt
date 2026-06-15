@@ -23,6 +23,7 @@ data class SubmitLocationResponseDto(
 @Serializable
 data class ChildLocationResponseDto(
     val childId: String,
+    val displayName: String = "",
     val latitude: Double,
     val longitude: Double,
     val accuracyMeters: Double? = null,
@@ -31,8 +32,38 @@ data class ChildLocationResponseDto(
 )
 
 @Serializable
+data class ChildLocationsResponseDto(
+    val children: List<ChildLocationResponseDto>
+)
+
+@Serializable
 data class ChildStatsResponseDto(
     val childId: String,
     val totalScore: Int,
     val rating: Int
 )
+
+@Serializable
+data class NotificationsResponseDto(
+    val notifications: List<NotificationDto>
+)
+
+@Serializable
+data class NotificationDto(
+    val id: String,
+    val recipientUserId: String,
+    val childId: String? = null,
+    val type: NotificationTypeDto,
+    val title: String,
+    val body: String,
+    val risk: RiskLevelDto? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val createdAt: String,
+    val readAt: String? = null
+)
+
+@Serializable
+enum class NotificationTypeDto {
+    ChildEnteredRedZone
+}

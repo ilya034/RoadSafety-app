@@ -72,6 +72,15 @@ interface RoadSafetyApi {
     @GET("tracking/children/{childId}/location")
     suspend fun getChildLocation(@Path("childId") childId: String): Response<ChildLocationResponseDto>
 
+    @GET("tracking/children/locations")
+    suspend fun getChildrenLocations(): Response<ChildLocationsResponseDto>
+
     @GET("tracking/children/{childId}/stats")
     suspend fun getChildStats(@Path("childId") childId: String): Response<ChildStatsResponseDto>
+
+    @GET("notifications")
+    suspend fun getNotifications(@Query("unreadOnly") unreadOnly: Boolean = false): Response<NotificationsResponseDto>
+
+    @POST("notifications/{id}/read")
+    suspend fun markNotificationRead(@Path("id") id: String): Response<Unit>
 }

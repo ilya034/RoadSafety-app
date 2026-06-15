@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -23,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -38,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import org.maplibre.compose.camera.CameraPosition
@@ -79,12 +82,44 @@ fun MapColoringScreen(
         )
     )
 
+    LaunchedEffect(Unit) {
+        viewModel.refreshForCurrentUser()
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.stopScreenWork()
+        }
+    }
+
     val currentLocationSource = remember(state.currentLocation) {
         if (state.currentLocation != null) {
             val point = Point(
                 Position(state.currentLocation!!.longitude, state.currentLocation!!.latitude)
             )
             FeatureCollection(listOf(GeoJsonFeature(point, JsonObject(emptyMap()), null)))
+        } else {
+            FeatureCollection(emptyList<GeoJsonFeature<Point, JsonObject>>())
+        }
+    }
+
+    val childLocationSource = remember(state.childLocations) {
+        if (state.childLocations.isNotEmpty()) {
+            FeatureCollection(
+                state.childLocations.map { child ->
+                    GeoJsonFeature(
+                        Point(Position(child.point.longitude, child.point.latitude)),
+                        JsonObject(
+                            mapOf(
+                                "childId" to JsonPrimitive(child.childId),
+                                "displayName" to JsonPrimitive(child.label),
+                                "risk" to JsonPrimitive(child.currentRisk),
+                                "lastUpdatedAt" to JsonPrimitive(child.lastUpdatedAt)
+                            )
+                        ),
+                        null
+                    )
+                }
+            )
         } else {
             FeatureCollection(emptyList<GeoJsonFeature<Point, JsonObject>>())
         }
@@ -111,14 +146,14 @@ fun MapColoringScreen(
                 key(tileUrl) {
                     val vectorSource = rememberVectorSource(
                         tiles = listOf(tileUrl),
-                        options = TileSetOptions(minZoom = 12, maxZoom = 18)
+                        options = TileSetOptions(minZoom = 9, maxZoom = 18)
                     )
 
                     FillLayer(
                         id = "safety-zones-layer",
                         source = vectorSource,
                         sourceLayer = "safety_zones",
-                        minZoom = 12f,
+                        minZoom = 9f,
                         maxZoom = 18f,
                         color = safetyZoneColorExpression(state.overrides),
                         opacity = const(0.35f),
@@ -156,16 +191,33 @@ fun MapColoringScreen(
                     )
                 }
             }
+
+            if (state.childLocations.isNotEmpty()) {
+                key(state.childLocations) {
+                    val childrenGeoJsonSource = rememberGeoJsonSource(
+                        data = GeoJsonData.Features(childLocationSource)
+                    )
+                    CircleLayer(
+                        id = "children-location-markers",
+                        source = childrenGeoJsonSource,
+                        color = childRiskColorExpression(),
+                        radius = const(9.dp),
+                        strokeColor = const(Color.White),
+                        strokeWidth = const(2.dp)
+                    )
+                }
+            }
         }
 
-        PaintPanel(
-            selectedColor = state.activePaintColor,
-            onColorSelected = viewModel::onPaintColorSelected,
-            enabled = state.canEditMap,
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 16.dp)
-        )
+        if (state.canEditMap) {
+            PaintPanel(
+                selectedColor = state.activePaintColor,
+                onColorSelected = viewModel::onPaintColorSelected,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 16.dp)
+            )
+        }
 
         CitySelector(
             cities = state.cities,
@@ -175,6 +227,15 @@ fun MapColoringScreen(
                 .align(Alignment.TopStart)
                 .padding(16.dp)
         )
+
+        if (state.isParent && state.childLocations.isNotEmpty()) {
+            ChildrenLegend(
+                children = state.childLocations,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+            )
+        }
 
         if (state.isLoading) {
             CircularProgressIndicator(
@@ -196,6 +257,59 @@ fun MapColoringScreen(
             }
         }
     }
+}
+
+@Composable
+private fun ChildrenLegend(
+    children: List<ChildMapLocation>,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.width(180.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            children.take(5).forEach { child ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(child.currentRisk.toRiskColor())
+                    )
+                    Text(
+                        text = child.label,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun String.toRiskColor(): Color = when {
+    equals("Red", ignoreCase = true) -> Color(0xFFC62828)
+    equals("Yellow", ignoreCase = true) -> Color(0xFFF9A825)
+    equals("Green", ignoreCase = true) -> Color(0xFF2E7D32)
+    else -> Color(0xFF1565C0)
+}
+
+private fun childRiskColorExpression(): Expression<ColorValue> {
+    return switch(
+        input = feature["risk"].convertToString(),
+        case(listOf("Green", "green", "GREEN"), const(Color(0xFF2E7D32))),
+        case(listOf("Yellow", "yellow", "YELLOW"), const(Color(0xFFF9A825))),
+        case(listOf("Red", "red", "RED"), const(Color(0xFFC62828))),
+        fallback = const(Color(0xFF1565C0))
+    )
 }
 
 private const val MapBaseStyleUrl = "https://tiles.openfreemap.org/styles/bright"
@@ -255,7 +369,6 @@ private fun MapCityBbox.defaultZoom(): Double {
 fun PaintPanel(
     selectedColor: MapAreaColor?,
     onColorSelected: (MapAreaColor?) -> Unit,
-    enabled: Boolean,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -278,14 +391,13 @@ fun PaintPanel(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(CircleShape)
-                        .background(if (enabled) composeColor else composeColor.copy(alpha = 0.35f))
+                        .background(composeColor)
                         .border(
-                            width = if (enabled && isSelected) 3.dp else 0.dp,
+                            width = if (isSelected) 3.dp else 0.dp,
                             color = if (isSelected) Color.White else Color.Transparent,
                             shape = CircleShape
                         )
                         .clickable {
-                            if (!enabled) return@clickable
                             if (isSelected) onColorSelected(null)
                             else onColorSelected(domainColor)
                         },
@@ -300,8 +412,7 @@ fun PaintPanel(
             HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))
 
             FilledIconButton(
-                onClick = { if (enabled) onColorSelected(null) },
-                enabled = enabled,
+                onClick = { onColorSelected(null) },
                 modifier = Modifier.size(40.dp),
                 colors = IconButtonDefaults.filledIconButtonColors(
                     containerColor = if (selectedColor == null)
@@ -311,7 +422,7 @@ fun PaintPanel(
                 )
             ) {
                 Text(
-                    if (enabled) "OFF" else "VIEW",
+                    "OFF",
                     style = MaterialTheme.typography.labelSmall,
                     color = if (selectedColor == null)
                         MaterialTheme.colorScheme.onPrimaryContainer
