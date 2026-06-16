@@ -98,7 +98,7 @@ class FamilyRepositoryImpl @Inject constructor(
                         id = UUID.randomUUID().toString(),
                         familyId = FamilyId(UUID.fromString(body.familyId)),
                         userId = body.userId,
-                        role = UserRole.valueOf(body.role.uppercase()),
+                        role = UserRole.fromString(body.role) ?: UserRole.CHILD,
                         joinedAt = ""
                     )
                 )
@@ -135,7 +135,7 @@ class FamilyRepositoryImpl @Inject constructor(
                         id = UUID.randomUUID().toString(),
                         familyId = familyId,
                         userId = bodyMember.id,
-                        role = UserRole.valueOf(bodyMember.role.uppercase()),
+                        role = UserRole.fromString(bodyMember.role) ?: UserRole.CHILD,
                         joinedAt = ""
                     )
                 })
@@ -150,7 +150,7 @@ class FamilyRepositoryImpl @Inject constructor(
                         id = UUID.randomUUID().toString(),
                         familyId = familyId,
                         userId = bodyMember.id,
-                        role = UserRole.valueOf(bodyMember.role.uppercase()),
+                        role = UserRole.fromString(bodyMember.role) ?: UserRole.CHILD,
                         joinedAt = ""
                     )
                 })
@@ -183,7 +183,7 @@ class FamilyRepositoryImpl @Inject constructor(
     }
 
     override fun getSelectedRole(): UserRole? {
-        return prefs.getString("selected_role", null)?.let { UserRole.valueOf(it) }
+        return prefs.getString("selected_role", null)?.let { UserRole.fromString(it) }
     }
 
     override fun setSelectedCityId(cityId: String) {

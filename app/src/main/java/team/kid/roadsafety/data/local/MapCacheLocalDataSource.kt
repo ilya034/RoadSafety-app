@@ -13,7 +13,7 @@ import javax.inject.Singleton
 
 @Singleton
 class MapCacheLocalDataSource @Inject constructor(
-    @ApplicationContext context: Context,
+    @ApplicationContext private val context: Context,
     private val json: Json
 ) {
     private val prefs = context.getSharedPreferences("map_cache", Context.MODE_PRIVATE)
@@ -39,16 +39,44 @@ class MapCacheLocalDataSource @Inject constructor(
     }
 
     fun getAlertZones(cityId: String, familyId: String, childId: String?): AlertZonesResponseDto? {
-        return prefs.getString(alertZonesKey(cityId, familyId, childId), null)?.decodeOrNull()
+        val key = alertZonesKey(cityId, familyId, childId)
+        if (prefs.contains(key)) {
+            val oldData = prefs.getString(key, null)
+            prefs.edit().remove(key).apply()
+            if (oldData != null) {
+                try {
+                    getAlertZonesFile(cityId, familyId, childId).writeText(oldData)
+                } catch (_: Exception) {}
+            }
+        }
+
+        val file = getAlertZonesFile(cityId, familyId, childId)
+        if (!file.exists()) return null
+        return try {
+            file.readText().decodeOrNull()
+        } catch (e: Exception) {
+            null
+        }
     }
 
     fun saveAlertZones(cityId: String, familyId: String, childId: String?, zones: AlertZonesResponseDto) {
+        try {
+            val jsonString = json.encodeToString(zones)
+            getAlertZonesFile(cityId, familyId, childId).writeText(jsonString)
+        } catch (_: Exception) {}
+
+        val key = alertZonesKey(cityId, familyId, childId)
         prefs.edit()
-            .putString(alertZonesKey(cityId, familyId, childId), json.encodeToString(zones))
+            .remove(key)
             .putString(ActiveAlertCityIdKey, cityId)
             .putString(ActiveAlertFamilyIdKey, familyId)
             .putString(ActiveAlertChildIdKey, childId)
             .apply()
+    }
+
+    private fun getAlertZonesFile(cityId: String, familyId: String, childId: String?): java.io.File {
+        val fileName = "alert_zones_${cityId}_${familyId}_${childId ?: "all"}.json"
+        return java.io.File(context.filesDir, fileName)
     }
 
     fun getActiveAlertZones(): AlertZonesResponseDto? {

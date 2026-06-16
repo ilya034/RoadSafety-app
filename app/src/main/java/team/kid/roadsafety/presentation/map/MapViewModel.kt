@@ -21,6 +21,7 @@ import team.kid.roadsafety.domain.aggregates.map.MapCityMetadata
 import team.kid.roadsafety.domain.aggregates.map.MapRepository
 import team.kid.roadsafety.domain.aggregates.tracking.TrackingRepository
 import team.kid.roadsafety.domain.aggregates.user.AuthRepository
+import team.kid.roadsafety.domain.aggregates.user.UserRole
 import team.kid.roadsafety.infrastructure.NetworkMonitor
 import team.kid.roadsafety.infrastructure.location.LocationObserver
 import team.kid.roadsafety.infrastructure.map.MapTileCacheService
@@ -77,7 +78,7 @@ class MapViewModel @Inject constructor(
         val userResult = authRepository.getCurrentUser()
         val currentUser = userResult.getOrNull()
         val familyId = currentUser?.familyId
-        val isParent = currentUser?.familyRole.equals("Parent", ignoreCase = true)
+        val isParent = UserRole.fromString(currentUser?.familyRole) == UserRole.PARENT
         val familyCityId = familyRepository.getSelectedCityId() ?: DefaultCityId
         val cities = familyRepository.getSupportedCities().getOrDefault(listOf(DefaultCity))
         val activeCity = cities.firstOrNull { it.cityId == familyCityId } ?: cities.firstOrNull() ?: DefaultCity

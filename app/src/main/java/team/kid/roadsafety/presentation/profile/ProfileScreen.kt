@@ -58,12 +58,17 @@ fun ProfileScreen(
                         PersonalInfoSection(user = user, members = state.members)
                     }
 
+                    val currentUserRole = state.members.find { it.userId == user.id }?.role ?: UserRole.fromString(user.familyRole)
+                    val isChild = currentUserRole == UserRole.CHILD
+
                     val children = state.members.filter { it.role == UserRole.CHILD }
                     item {
                         MembersSection(
                             title = "Дети",
                             members = children,
-                            onAddClick = { viewModel.generateInviteCode(UserRole.CHILD) }
+                            onAddClick = if (!isChild) {
+                                { viewModel.generateInviteCode(UserRole.CHILD) }
+                            } else null
                         )
                     }
 
@@ -72,7 +77,9 @@ fun ProfileScreen(
                         MembersSection(
                             title = "Все родители",
                             members = parents,
-                            onAddClick = { viewModel.generateInviteCode(UserRole.PARENT) }
+                            onAddClick = if (!isChild) {
+                                { viewModel.generateInviteCode(UserRole.PARENT) }
+                            } else null
                         )
                     }
                 }
@@ -206,7 +213,7 @@ fun InfoRow(label: String, value: String) {
 }
 
 @Composable
-fun MembersSection(title: String, members: List<FamilyMemberEntity>, onAddClick: () -> Unit) {
+fun MembersSection(title: String, members: List<FamilyMemberEntity>, onAddClick: (() -> Unit)? = null) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = Color.Gray.copy(alpha = 0.8f),
@@ -225,11 +232,13 @@ fun MembersSection(title: String, members: List<FamilyMemberEntity>, onAddClick:
                 Spacer(modifier = Modifier.height(8.dp))
             }
             
-            IconButton(
-                onClick = onAddClick, 
-                modifier = Modifier.align(Alignment.CenterHorizontally).background(Color.White, CircleShape).size(30.dp)
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.Gray)
+            if (onAddClick != null) {
+                IconButton(
+                    onClick = onAddClick, 
+                    modifier = Modifier.align(Alignment.CenterHorizontally).background(Color.White, CircleShape).size(30.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.Gray)
+                }
             }
         }
     }

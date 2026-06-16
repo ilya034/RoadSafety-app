@@ -36,6 +36,16 @@ class MapTileCacheService @Inject constructor(
 
     private val stylePrefs = context.getSharedPreferences("map_style_cache", Context.MODE_PRIVATE)
 
+    private val tileOkHttpClient: OkHttpClient by lazy {
+        okHttpClient.newBuilder()
+            .apply {
+                interceptors().clear()
+                networkInterceptors().clear()
+                authenticator(okhttp3.Authenticator.NONE)
+            }
+            .build()
+    }
+
     suspend fun getStyleJsonForCity(cityId: String): String {
         val template = withContext(Dispatchers.IO) {
             try {
@@ -163,7 +173,7 @@ class MapTileCacheService @Inject constructor(
         urls.forEach { url ->
             val request = Request.Builder().url(url).get().build()
             try {
-                okHttpClient.newCall(request).execute().use { response ->
+                tileOkHttpClient.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) return@use
                     val bytes = response.body.bytes()
                     offlineManager.putResourceWithUrl(

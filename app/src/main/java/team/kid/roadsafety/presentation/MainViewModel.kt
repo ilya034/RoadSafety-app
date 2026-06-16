@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import team.kid.roadsafety.data.dto.UserResponseDto
 import team.kid.roadsafety.domain.aggregates.user.AuthRepository
+import team.kid.roadsafety.domain.aggregates.user.UserRole
 import javax.inject.Inject
 
 @HiltViewModel
@@ -75,11 +76,11 @@ class MainViewModel @Inject constructor(
         val newState = if (user.familyId == null) {
             AuthState.AuthenticatedButNoFamily(user)
         } else {
-            val role = user.familyRole?.let { parseUserRole(it) }
+            val role = UserRole.fromString(user.familyRole)
             if (role != null) {
                 familyRepository.setSelectedRole(role)
             }
-            _isChild.update { role == team.kid.roadsafety.domain.aggregates.user.UserRole.CHILD }
+            _isChild.update { role == UserRole.CHILD }
             AuthState.Authenticated(user)
         }
         Log.d("MainViewModel", "Updating state to: $newState")
@@ -107,14 +108,6 @@ class MainViewModel @Inject constructor(
     private fun stopLocationService(context: android.content.Context) {
         val intent = android.content.Intent(context, team.kid.roadsafety.infrastructure.location.LocationTrackingService::class.java)
         context.stopService(intent)
-    }
-
-    private fun parseUserRole(value: String): team.kid.roadsafety.domain.aggregates.user.UserRole? {
-        return when (value.lowercase()) {
-            "parent" -> team.kid.roadsafety.domain.aggregates.user.UserRole.PARENT
-            "child" -> team.kid.roadsafety.domain.aggregates.user.UserRole.CHILD
-            else -> null
-        }
     }
 }
 

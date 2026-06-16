@@ -33,12 +33,26 @@ object NetworkModule {
         authInterceptor: AuthInterceptor,
         tokenAuthenticator: TokenAuthenticator
     ): OkHttpClient {
+        val debugLevel = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
+        val debugHeadersLevel = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.HEADERS else HttpLoggingInterceptor.Level.NONE
+
+        val bodyLogger = HttpLoggingInterceptor().apply { level = debugLevel }
+        val headersLogger = HttpLoggingInterceptor().apply { level = debugHeadersLevel }
+
+        val safeLoggingInterceptor = okhttp3.Interceptor { chain ->
+            val request = chain.request()
+            val path = request.url.encodedPath
+            if (path.contains("/maps/alert-zones") || path.endsWith(".pbf")) {
+                headersLogger.intercept(chain)
+            } else {
+                bodyLogger.intercept(chain)
+            }
+        }
+
         return OkHttpClient.Builder()
             .addInterceptor(authInterceptor)
             .authenticator(tokenAuthenticator)
-            .addInterceptor(HttpLoggingInterceptor().apply {
-                level = HttpLoggingInterceptor.Level.BODY
-            })
+            .addInterceptor(safeLoggingInterceptor)
             .build()
     }
 
