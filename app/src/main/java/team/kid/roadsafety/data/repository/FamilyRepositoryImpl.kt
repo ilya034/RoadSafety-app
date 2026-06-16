@@ -2,8 +2,10 @@ package team.kid.roadsafety.data.repository
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.serialization.json.Json
 import team.kid.roadsafety.data.dto.CreateFamilyRequestDto
 import team.kid.roadsafety.data.dto.CreateInviteCodeRequestDto
+import team.kid.roadsafety.data.dto.GetFamilyMembersResponseDto
 import team.kid.roadsafety.data.dto.JoinFamilyByInviteCodeRequestDto
 import team.kid.roadsafety.data.dto.MapCityDto
 import team.kid.roadsafety.data.dto.UpdateFamilyCityRequestDto
@@ -23,6 +25,7 @@ import javax.inject.Inject
 class FamilyRepositoryImpl @Inject constructor(
     private val api: RoadSafetyApi,
     private val mapCache: MapCacheLocalDataSource,
+    private val json: Json,
     @ApplicationContext context: Context
 ) : FamilyRepository {
 
@@ -57,7 +60,9 @@ class FamilyRepositoryImpl @Inject constructor(
                 if (body != null) {
                     mapCache.saveCities(body)
                 }
-                Result.success(body?.cities?.map { it.toDomain() } ?: cachedCities())
+                val apiCities = body?.cities?.map { it.toDomain() }.orEmpty()
+                val mergedCities = (apiCities + fallbackCities).distinctBy { it.cityId }
+                Result.success(mergedCities)
             } else {
                 Result.success(cachedCities())
             }
@@ -123,12 +128,14 @@ class FamilyRepositoryImpl @Inject constructor(
         return try {
             val response = api.getFamilyMembers(familyId.value.toString())
             if (response.isSuccessful) {
-                Result.success(response.body()!!.members.map { body ->
+                val body = response.body()!!
+                saveCachedMembers(familyId, body)
+                Result.success(body.members.map { bodyMember ->
                     FamilyMemberEntity(
                         id = UUID.randomUUID().toString(),
                         familyId = familyId,
-                        userId = body.id,
-                        role = UserRole.valueOf(body.role.uppercase()),
+                        userId = bodyMember.id,
+                        role = UserRole.valueOf(bodyMember.role.uppercase()),
                         joinedAt = ""
                     )
                 })
@@ -136,7 +143,38 @@ class FamilyRepositoryImpl @Inject constructor(
                 Result.failure(Exception(response.parseErrorMessage("Get members failed")))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            val cachedDto = getCachedMembers(familyId)
+            if (cachedDto != null) {
+                Result.success(cachedDto.members.map { bodyMember ->
+                    FamilyMemberEntity(
+                        id = UUID.randomUUID().toString(),
+                        familyId = familyId,
+                        userId = bodyMember.id,
+                        role = UserRole.valueOf(bodyMember.role.uppercase()),
+                        joinedAt = ""
+                    )
+                })
+            } else {
+                Result.failure(e)
+            }
+        }
+    }
+
+    private fun saveCachedMembers(familyId: FamilyId, body: GetFamilyMembersResponseDto) {
+        try {
+            val jsonStr = json.encodeToString(GetFamilyMembersResponseDto.serializer(), body)
+            prefs.edit().putString("cached_members_${familyId.value}", jsonStr).apply()
+        } catch (e: Exception) {
+            // Ignore serialization exceptions
+        }
+    }
+
+    private fun getCachedMembers(familyId: FamilyId): GetFamilyMembersResponseDto? {
+        val jsonStr = prefs.getString("cached_members_${familyId.value}", null) ?: return null
+        return try {
+            json.decodeFromString(GetFamilyMembersResponseDto.serializer(), jsonStr)
+        } catch (e: Exception) {
+            null
         }
     }
 
@@ -176,10 +214,32 @@ class FamilyRepositoryImpl @Inject constructor(
     }
 
     private fun cachedCities(): List<MapCity> {
-        return mapCache.getCities()?.cities?.map { it.toDomain() } ?: fallbackCities
+        val cached = mapCache.getCities()?.cities?.map { it.toDomain() } ?: fallbackCities
+        return (cached + fallbackCities).distinctBy { it.cityId }
     }
 
     private companion object {
-        val fallbackCities = listOf(MapCity(cityId = "ekb", name = "Екатеринбург"))
+        val fallbackCities = listOf(
+            MapCity(
+                cityId = "ekb",
+                name = "Екатеринбург",
+                bbox = MapCityBbox(
+                    minLon = 60.3,
+                    minLat = 56.7,
+                    maxLon = 60.9,
+                    maxLat = 56.9
+                )
+            ),
+            MapCity(
+                cityId = "salekhard",
+                name = "Салехард",
+                bbox = MapCityBbox(
+                    minLon = 66.5,
+                    minLat = 66.5,
+                    maxLon = 66.7,
+                    maxLat = 66.6
+                )
+            )
+        )
     }
 }

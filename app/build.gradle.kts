@@ -62,6 +62,7 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.core)
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.maplibre.compose)
+    implementation(libs.maplibre.android)
 
     implementation(libs.retrofit)
     implementation(libs.retrofit.serialization)

@@ -20,4 +20,6 @@ interface AuthRepository {
     suspend fun getTokens(): AuthTokens?
     
     suspend fun saveTokens(tokens: AuthTokens)
+
+    suspend fun getCachedUser(): UserResponseDto?
 }

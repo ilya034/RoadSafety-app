@@ -49,8 +49,14 @@ class MainViewModel @Inject constructor(
             updateStateWithUser(user)
         }.onFailure { error ->
             Log.e("MainViewModel", "Failed to fetch user profile", error)
-            // Handle 401 and refresh logic if needed, but for now just unauth
-            _authState.value = AuthState.Unauthenticated
+            val isAuthError = error.message?.contains("401") == true || error.message?.contains("403") == true
+            val cachedUser = authRepository.getCachedUser()
+            if (isAuthError || cachedUser == null) {
+                _authState.value = AuthState.Unauthenticated
+            } else {
+                Log.d("MainViewModel", "Failed to fetch user profile (likely network issue), fallback to cached user")
+                updateStateWithUser(cachedUser)
+            }
         }
     }
 

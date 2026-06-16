@@ -1,11 +1,16 @@
 package team.kid.roadsafety.presentation
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.Composable
@@ -24,37 +29,76 @@ import team.kid.roadsafety.presentation.family.FamilyOnboardingScreen
 import team.kid.roadsafety.presentation.map.MapColoringScreen
 import team.kid.roadsafety.presentation.profile.ProfileScreen
 import team.kid.roadsafety.infrastructure.location.LocationPermissionHelper
+import team.kid.roadsafety.infrastructure.location.WarningAlertEvents
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 
 @Composable
 fun RoadSafetyApp(viewModel: MainViewModel = hiltViewModel()) {
     val authState by viewModel.authState.collectAsState()
+    val warningAlert by WarningAlertEvents.current.collectAsState()
 
-    when (val state = authState) {
-        is AuthState.Loading -> {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+    Box(modifier = Modifier.fillMaxSize()) {
+        when (val state = authState) {
+            is AuthState.Loading -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            }
+            is AuthState.Authenticated -> {
+                val isChild by viewModel.isChild.collectAsState()
+                val context = LocalContext.current
+
+                if (isChild) {
+                    LocationPermissionHelper(
+                        onPermissionsGranted = {
+                            viewModel.startLocationService(context)
+                        }
+                    )
+                }
+
+                MainScreen(onLogout = { viewModel.logout(context) })
+            }
+            is AuthState.AuthenticatedButNoFamily -> {
+                FamilyOnboardingScreen(onSuccess = viewModel::onAuthSuccess)
+            }
+            is AuthState.Unauthenticated -> {
+                AuthNavigation(onAuthSuccess = viewModel::onAuthSuccess)
             }
         }
-        is AuthState.Authenticated -> {
-            val isChild by viewModel.isChild.collectAsState()
-            val context = LocalContext.current
-            
-            if (isChild) {
-                LocationPermissionHelper(
-                    onPermissionsGranted = {
-                        viewModel.startLocationService(context)
-                    }
-                )
-            }
-            
-            MainScreen(onLogout = { viewModel.logout(context) })
+
+        warningAlert?.let { alert ->
+            SafetyWarningBanner(
+                title = alert.title,
+                message = if (alert.offline) "${alert.message} (offline)" else alert.message,
+                onDismiss = WarningAlertEvents::dismiss,
+                modifier = Modifier.align(Alignment.TopCenter)
+            )
         }
-        is AuthState.AuthenticatedButNoFamily -> {
-            FamilyOnboardingScreen(onSuccess = viewModel::onAuthSuccess)
-        }
-        is AuthState.Unauthenticated -> {
-            AuthNavigation(onAuthSuccess = viewModel::onAuthSuccess)
+    }
+}
+
+@Composable
+private fun SafetyWarningBanner(
+    title: String,
+    message: String,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .statusBarsPadding()
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .fillMaxWidth(),
+        color = MaterialTheme.colorScheme.errorContainer,
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        tonalElevation = 6.dp,
+        shadowElevation = 6.dp,
+        onClick = onDismiss
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Text(text = title, style = MaterialTheme.typography.titleMedium)
+            Text(text = message, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }

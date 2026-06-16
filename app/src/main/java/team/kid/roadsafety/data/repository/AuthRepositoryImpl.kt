@@ -61,12 +61,19 @@ class AuthRepositoryImpl @Inject constructor(
         return try {
             val response = api.getCurrentUser()
             if (response.isSuccessful) {
-                Result.success(response.body()!!)
+                val user = response.body()!!
+                tokenManager.saveUser(user)
+                Result.success(user)
             } else {
                 Result.failure(Exception("Failed to get current user: ${response.code()}"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            val cachedUser = tokenManager.getUser()
+            if (cachedUser != null) {
+                Result.success(cachedUser)
+            } else {
+                Result.failure(e)
+            }
         }
     }
 
@@ -81,5 +88,9 @@ class AuthRepositoryImpl @Inject constructor(
 
     override suspend fun saveTokens(tokens: AuthTokens) {
         tokenManager.saveTokens(tokens)
+    }
+
+    override suspend fun getCachedUser(): UserResponseDto? {
+        return tokenManager.getUser()
     }
 }

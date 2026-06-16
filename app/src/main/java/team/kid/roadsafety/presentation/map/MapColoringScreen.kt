@@ -15,8 +15,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButtonDefaults
@@ -32,6 +30,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,6 +38,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -64,8 +65,8 @@ import org.maplibre.compose.util.ClickResult
 import org.maplibre.spatialk.geojson.FeatureCollection
 import org.maplibre.spatialk.geojson.Point
 import org.maplibre.spatialk.geojson.Position
+import team.kid.roadsafety.domain.aggregates.map.GeoPoint
 import team.kid.roadsafety.domain.aggregates.map.MapAreaColor
-import team.kid.roadsafety.domain.aggregates.map.MapCity
 import team.kid.roadsafety.domain.aggregates.map.MapCityBbox
 import org.maplibre.spatialk.geojson.Feature as GeoJsonFeature
 
@@ -89,6 +90,18 @@ fun MapColoringScreen(
         onDispose {
             viewModel.stopScreenWork()
         }
+    }
+
+    LaunchedEffect(cameraState) {
+        snapshotFlow {
+            val target = cameraState.position.target
+            GeoPoint(latitude = target.latitude, longitude = target.longitude)
+        }
+            .distinctUntilChanged()
+            .collectLatest { center ->
+                delay(400L)
+                viewModel.viewCityForCamera(center)
+            }
     }
 
     val currentLocationSource = remember(state.currentLocation) {
@@ -125,28 +138,36 @@ fun MapColoringScreen(
         }
     }
 
-    LaunchedEffect(state.activeMapCityId, state.metadata?.bbox, state.cities) {
+    var didCenterInitialCity by remember { mutableStateOf(false) }
+    LaunchedEffect(state.activeMapCityId, state.familyCityId, state.metadata?.bbox, state.cities) {
         val bbox = state.metadata?.bbox
-            ?: state.cities.firstOrNull { it.cityId == state.activeMapCityId }?.bbox
-        if (bbox != null) {
+            ?: state.cities.firstOrNull { it.cityId == state.familyCityId }?.bbox
+        if (!didCenterInitialCity && state.activeMapCityId == state.familyCityId && bbox != null) {
             cameraState.position = CameraPosition(
                 target = bbox.centerPosition(),
                 zoom = bbox.defaultZoom()
             )
+            didCenterInitialCity = true
         }
+    }
+
+    val baseStyle = remember(state.mapStyleJson) {
+        state.mapStyleJson?.let { BaseStyle.Json(it) } ?: BaseStyle.Uri(MapBaseStyleUrl)
     }
 
     Box(modifier = modifier.fillMaxSize()) {
         MaplibreMap(
             modifier = Modifier.fillMaxSize(),
-            baseStyle = BaseStyle.Uri(MapBaseStyleUrl),
+            baseStyle = baseStyle,
             cameraState = cameraState
         ) {
-            state.tileUrl?.let { tileUrl ->
+             state.tileUrl?.let { tileUrl ->
                 key(tileUrl) {
+                    val tileList = remember(tileUrl) { listOf(tileUrl) }
+                    val tileOptions = remember { TileSetOptions(minZoom = 9, maxZoom = 18) }
                     val vectorSource = rememberVectorSource(
-                        tiles = listOf(tileUrl),
-                        options = TileSetOptions(minZoom = 9, maxZoom = 18)
+                        tiles = tileList,
+                        options = tileOptions
                     )
 
                     FillLayer(
@@ -178,8 +199,11 @@ fun MapColoringScreen(
 
             if (state.currentLocation != null) {
                 key(state.currentLocation) {
+                    val locationGeoJsonData = remember(currentLocationSource) {
+                        GeoJsonData.Features(currentLocationSource)
+                    }
                     val locationGeoJsonSource = rememberGeoJsonSource(
-                        data = GeoJsonData.Features(currentLocationSource)
+                        data = locationGeoJsonData
                     )
                     CircleLayer(
                         id = "current-location-marker",
@@ -194,8 +218,11 @@ fun MapColoringScreen(
 
             if (state.childLocations.isNotEmpty()) {
                 key(state.childLocations) {
+                    val childrenGeoJsonData = remember(childLocationSource) {
+                        GeoJsonData.Features(childLocationSource)
+                    }
                     val childrenGeoJsonSource = rememberGeoJsonSource(
-                        data = GeoJsonData.Features(childLocationSource)
+                        data = childrenGeoJsonData
                     )
                     CircleLayer(
                         id = "children-location-markers",
@@ -218,15 +245,6 @@ fun MapColoringScreen(
                     .padding(end = 16.dp)
             )
         }
-
-        CitySelector(
-            cities = state.cities,
-            activeCityId = state.activeMapCityId,
-            onCitySelected = viewModel::viewCity,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(16.dp)
-        )
 
         if (state.isParent && state.childLocations.isNotEmpty()) {
             ChildrenLegend(
@@ -429,53 +447,6 @@ fun PaintPanel(
                     else
                         MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            }
-        }
-    }
-}
-
-@Composable
-private fun CitySelector(
-    cities: List<MapCity>,
-    activeCityId: String,
-    onCitySelected: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    if (cities.isEmpty()) return
-
-    var expanded by remember { mutableStateOf(false) }
-    val activeCity = cities.firstOrNull { it.cityId == activeCityId }
-    val label = activeCity?.name ?: activeCityId
-
-    Card(
-        modifier = modifier,
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-        shape = MaterialTheme.shapes.medium
-    ) {
-        Box {
-            Text(
-                text = label,
-                modifier = Modifier
-                    .clickable { expanded = true }
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                style = MaterialTheme.typography.bodyMedium
-            )
-
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false }
-            ) {
-                cities.forEach { city ->
-                    DropdownMenuItem(
-                        text = {
-                            Text(text = city.name)
-                        },
-                        onClick = {
-                            onCitySelected(city.cityId)
-                            expanded = false
-                        }
-                    )
-                }
             }
         }
     }

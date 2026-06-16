@@ -42,6 +42,7 @@ class MapViewModel @Inject constructor(
 
     private var initializationJob: Job? = null
     private var childrenLocationPollingJob: Job? = null
+    private var requestedMapCityId: String? = null
 
     init {
         observeLocationUpdates()
@@ -64,6 +65,7 @@ class MapViewModel @Inject constructor(
     private suspend fun initializeMap() {
         childrenLocationPollingJob?.cancel()
         childrenLocationPollingJob = null
+        requestedMapCityId = null
 
         _uiState.update {
             MapUiState(
@@ -96,7 +98,13 @@ class MapViewModel @Inject constructor(
     }
 
     private suspend fun loadCity(cityId: String, familyId: String?) {
+        val styleJob = viewModelScope.launch {
+            val styleJson = mapTileCacheService.getStyleJsonForCity(cityId)
+            _uiState.update { it.copy(mapStyleJson = styleJson) }
+        }
+
         loadCachedCity(cityId, familyId)
+        styleJob.join()
 
         if (!networkMonitor.isOnline()) {
             _uiState.update { it.copy(isLoading = false) }
@@ -106,21 +114,17 @@ class MapViewModel @Inject constructor(
         val metadataResult = mapRepository.getCityMetadata(cityId)
         metadataResult.fold(
             onSuccess = { metadata ->
-                val configuredBbox = _uiState.value.cities
-                    .firstOrNull { it.cityId == cityId }
-                    ?.bbox
-                val effectiveMetadata = metadata.copy(bbox = metadata.bbox.union(configuredBbox))
                 val tileUrl = buildTileUrl(cityId, metadata.generationVersion)
                 _uiState.update {
                     it.copy(
                         isLoading = false,
                         activeMapCityId = cityId,
-                        metadata = effectiveMetadata,
+                        metadata = metadata,
                         tileUrl = tileUrl,
                         error = null
                     )
                 }
-                refreshTileCache(cityId, effectiveMetadata, tileUrl)
+                refreshTileCache(cityId, metadata, tileUrl)
             },
             onFailure = { error ->
                 val generationVersion = "fallback"
@@ -138,6 +142,7 @@ class MapViewModel @Inject constructor(
 
         if (familyId != null) {
             loadOverrides(familyId)
+            syncAlertZones(cityId, familyId)
         } else {
             _uiState.update { it.copy(overrides = emptyMap()) }
         }
@@ -212,6 +217,15 @@ class MapViewModel @Inject constructor(
                     }
                 }
             )
+    }
+
+    private suspend fun syncAlertZones(cityId: String, familyId: String) {
+        mapRepository.getAlertZones(cityId, familyId)
+            .onFailure { error ->
+                _uiState.update {
+                    it.copy(error = error.message ?: "Failed to sync alert zones")
+                }
+            }
     }
 
     private fun loadCachedCity(cityId: String, familyId: String?) {
@@ -325,19 +339,35 @@ class MapViewModel @Inject constructor(
     }
 
     fun viewCity(cityId: String) {
-        if (cityId == _uiState.value.activeMapCityId) return
+        if (cityId == _uiState.value.activeMapCityId || cityId == requestedMapCityId) return
+        requestedMapCityId = cityId
 
         viewModelScope.launch {
-            _uiState.update {
-                it.copy(
-                    isLoading = true,
-                    activePaintColor = null,
-                    overrides = emptyMap(),
-                    error = null
-                )
+            try {
+                _uiState.update {
+                    it.copy(
+                        isLoading = true,
+                        activePaintColor = null,
+                        overrides = emptyMap(),
+                        error = null
+                    )
+                }
+                loadCity(cityId, _uiState.value.familyId)
+            } finally {
+                if (requestedMapCityId == cityId) {
+                    requestedMapCityId = null
+                }
             }
-            loadCity(cityId, _uiState.value.familyId)
         }
+    }
+
+    fun viewCityForCamera(center: GeoPoint) {
+        val state = _uiState.value
+        val city = state.cities.firstOrNull { city ->
+            city.bbox?.contains(center) == true
+        } ?: return
+
+        viewCity(city.cityId)
     }
 
     fun dismissAreaSelection() {
@@ -357,7 +387,16 @@ class MapViewModel @Inject constructor(
     private companion object {
         const val DefaultCityId = "ekb"
         const val BaseMapStyleUrl = "https://tiles.openfreemap.org/styles/bright"
-        val DefaultCity = MapCity(cityId = DefaultCityId, name = "Ekaterinburg")
+        val DefaultCity = MapCity(
+            cityId = DefaultCityId,
+            name = "Екатеринбург",
+            bbox = team.kid.roadsafety.domain.aggregates.map.MapCityBbox(
+                minLon = 60.3,
+                minLat = 56.7,
+                maxLon = 60.9,
+                maxLat = 56.9
+            )
+        )
     }
 }
 
@@ -369,6 +408,7 @@ data class MapUiState(
     val isParent: Boolean = false,
     val metadata: MapCityMetadata? = null,
     val tileUrl: String? = null,
+    val mapStyleJson: String? = null,
     val overrides: Map<String, MapAreaColor> = emptyMap(),
     val activePaintColor: MapAreaColor? = null,
     val isLoading: Boolean = false,
@@ -377,7 +417,11 @@ data class MapUiState(
     val childLocations: List<ChildMapLocation> = emptyList()
 ) {
     val canEditMap: Boolean
-        get() = familyId != null && isParent
+        get() = familyId != null && isParent && activeMapCityId == familyCityId
+}
+
+private fun MapCityBbox.contains(point: GeoPoint): Boolean {
+    return point.longitude in minLon..maxLon && point.latitude in minLat..maxLat
 }
 
 data class ChildMapLocation(
@@ -389,16 +433,4 @@ data class ChildMapLocation(
 ) {
     val label: String
         get() = displayName.ifBlank { "Child ${childId.take(8)}" }
-}
-
-private fun MapCityBbox?.union(other: MapCityBbox?): MapCityBbox? {
-    if (this == null) return other
-    if (other == null) return this
-
-    return MapCityBbox(
-        minLon = minOf(minLon, other.minLon),
-        minLat = minOf(minLat, other.minLat),
-        maxLon = maxOf(maxLon, other.maxLon),
-        maxLat = maxOf(maxLat, other.maxLat)
-    )
 }

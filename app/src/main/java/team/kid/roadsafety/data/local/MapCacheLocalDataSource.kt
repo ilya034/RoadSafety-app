@@ -4,6 +4,7 @@ import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import team.kid.roadsafety.data.dto.AlertZonesResponseDto
 import team.kid.roadsafety.data.dto.MapCitiesResponseDto
 import team.kid.roadsafety.data.dto.MapCityMetadataDto
 import team.kid.roadsafety.data.dto.UserMapAreaFeatureCollectionDto
@@ -37,6 +38,26 @@ class MapCacheLocalDataSource @Inject constructor(
             .apply()
     }
 
+    fun getAlertZones(cityId: String, familyId: String, childId: String?): AlertZonesResponseDto? {
+        return prefs.getString(alertZonesKey(cityId, familyId, childId), null)?.decodeOrNull()
+    }
+
+    fun saveAlertZones(cityId: String, familyId: String, childId: String?, zones: AlertZonesResponseDto) {
+        prefs.edit()
+            .putString(alertZonesKey(cityId, familyId, childId), json.encodeToString(zones))
+            .putString(ActiveAlertCityIdKey, cityId)
+            .putString(ActiveAlertFamilyIdKey, familyId)
+            .putString(ActiveAlertChildIdKey, childId)
+            .apply()
+    }
+
+    fun getActiveAlertZones(): AlertZonesResponseDto? {
+        val cityId = prefs.getString(ActiveAlertCityIdKey, null) ?: return null
+        val familyId = prefs.getString(ActiveAlertFamilyIdKey, null) ?: return null
+        val childId = prefs.getString(ActiveAlertChildIdKey, null)
+        return getAlertZones(cityId, familyId, childId)
+    }
+
     fun getCities(): MapCitiesResponseDto? {
         return prefs.getString(CitiesKey, null)?.decodeOrNull()
     }
@@ -61,7 +82,14 @@ class MapCacheLocalDataSource @Inject constructor(
         return "user_areas_${familyId}_${childId ?: "all"}"
     }
 
+    private fun alertZonesKey(cityId: String, familyId: String, childId: String?): String {
+        return "alert_zones_${cityId}_${familyId}_${childId ?: "all"}"
+    }
+
     private companion object {
         const val CitiesKey = "cities"
+        const val ActiveAlertCityIdKey = "active_alert_city_id"
+        const val ActiveAlertFamilyIdKey = "active_alert_family_id"
+        const val ActiveAlertChildIdKey = "active_alert_child_id"
     }
 }

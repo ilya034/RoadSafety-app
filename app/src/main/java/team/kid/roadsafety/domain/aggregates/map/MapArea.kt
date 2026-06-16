@@ -35,6 +35,13 @@ data class GeoPoint(
     val longitude: Double
 )
 
+data class AlertZone(
+    val id: String,
+    val baseAreaKey: String?,
+    val risk: MapAreaColor,
+    val points: List<GeoPoint>
+)
+
 data class MapCity(
     val cityId: String,
     val name: String,

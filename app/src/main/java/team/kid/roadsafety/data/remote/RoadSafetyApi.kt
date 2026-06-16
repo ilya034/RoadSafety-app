@@ -56,6 +56,13 @@ interface RoadSafetyApi {
         @Query("childId") childId: String? = null
     ): Response<UserMapAreaFeatureCollectionDto>
 
+    @GET("maps/alert-zones")
+    suspend fun getAlertZones(
+        @Query("cityId") cityId: String,
+        @Query("familyId") familyId: String,
+        @Query("childId") childId: String? = null
+    ): Response<AlertZonesResponseDto>
+
     @POST("maps/user-areas/base-overrides")
     suspend fun createBaseAreaOverride(
         @Body request: CreateBaseAreaOverrideRequestDto

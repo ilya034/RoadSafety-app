@@ -34,6 +34,56 @@ class MapTileCacheService @Inject constructor(
         OfflineManager.getInstance(context)
     }
 
+    private val stylePrefs = context.getSharedPreferences("map_style_cache", Context.MODE_PRIVATE)
+
+    suspend fun getStyleJsonForCity(cityId: String): String {
+        val template = withContext(Dispatchers.IO) {
+            try {
+                context.assets.open("protomaps_light_template.json").bufferedReader().use { it.readText() }
+            } catch (e: Exception) {
+                null
+            }
+        }
+
+        val pmtilesUrl = when (cityId) {
+            "salekhard" -> "pmtiles://https://roadsafety.my.to/maps/salekhard.pmtiles"
+            else -> "pmtiles://https://roadsafety.my.to/maps/ekb.pmtiles"
+        }
+
+        return if (template != null) {
+            template.replace("%PMTILES_URL%", pmtilesUrl)
+        } else {
+            getFallbackStyleJson(cityId)
+        }
+    }
+
+    private fun getFallbackStyleJson(cityId: String): String {
+        val pmtilesUrl = when (cityId) {
+            "salekhard" -> "pmtiles://https://roadsafety.my.to/maps/salekhard.pmtiles"
+            else -> "pmtiles://https://roadsafety.my.to/maps/ekb.pmtiles"
+        }
+        return """
+            {
+              "version": 8,
+              "sources": {
+                "openmaptiles": {
+                  "type": "vector",
+                  "url": "$pmtilesUrl"
+                }
+              },
+              "layers": [
+                {
+                  "id": "background",
+                  "type": "background",
+                  "paint": {
+                    "background-color": "#f8f4f0"
+                  }
+                }
+              ]
+            }
+        """.trimIndent()
+    }
+
     suspend fun configureAmbientCache() {
         withContext(Dispatchers.Main) {
             offlineManager.setMaximumAmbientCacheSize(AmbientCacheBytes, null)

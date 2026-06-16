@@ -19,6 +19,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import team.kid.roadsafety.R
+import team.kid.roadsafety.domain.aggregates.map.MapAreaColor
 import team.kid.roadsafety.domain.aggregates.tracking.TrackingRepository
 import javax.inject.Inject
 
@@ -27,6 +28,12 @@ class LocationTrackingService : Service() {
 
     @Inject
     lateinit var trackingRepository: TrackingRepository
+
+    @Inject
+    lateinit var localRiskEvaluator: LocalRiskEvaluator
+
+    @Inject
+    lateinit var warningAlertManager: WarningAlertManager
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var fusedLocationClient: FusedLocationProviderClient
@@ -48,9 +55,16 @@ class LocationTrackingService : Service() {
                             )
                             if (result.isFailure) {
                                 Log.e("LocationTrackingService", "Failed to submit location API side", result.exceptionOrNull())
+                                val localRisk = localRiskEvaluator.evaluate(location.latitude, location.longitude)
+                                warningAlertManager.handleRisk(localRisk, offline = true)
+                            } else {
+                                val serverRisk = MapAreaColor.fromString(result.getOrThrow().currentRisk.name)
+                                warningAlertManager.handleRisk(serverRisk, offline = false)
                             }
                         } catch (e: Exception) {
                             Log.e("LocationTrackingService", "Failed to submit location", e)
+                            val localRisk = localRiskEvaluator.evaluate(location.latitude, location.longitude)
+                            warningAlertManager.handleRisk(localRisk, offline = true)
                         }
                     }
                 }
