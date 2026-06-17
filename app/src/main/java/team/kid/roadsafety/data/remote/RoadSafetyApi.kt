@@ -74,6 +74,18 @@ interface RoadSafetyApi {
         @Body request: CreateCustomUserMapAreaRequestDto
     ): Response<UserMapAreaFeatureDto>
 
+    @DELETE("maps/user-areas/custom/{areaId}")
+    suspend fun deleteCustomArea(
+        @Path("areaId") areaId: String
+    ): Response<Unit>
+
+    @DELETE("maps/user-areas/base-overrides")
+    suspend fun resetBaseAreaColor(
+        @Query("familyId") familyId: String,
+        @Query("baseAreaKey") baseAreaKey: String,
+        @Query("childId") childId: String? = null
+    ): Response<Unit>
+
     @POST("tracking/location")
     suspend fun submitChildLocation(@Body request: SubmitLocationRequestDto): Response<SubmitLocationResponseDto>
 

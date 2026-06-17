@@ -2,9 +2,11 @@ package team.kid.roadsafety.presentation.map
 
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import team.kid.roadsafety.domain.aggregates.map.GeoPoint
+import team.kid.roadsafety.domain.aggregates.map.MapAreaColor
 
 class MapUiStateTest {
     @Test
@@ -129,5 +131,52 @@ class MapUiStateTest {
 
         assertEquals("salekhard", viewedCityState.activeMapCityId)
         assertFalse(viewedCityState.isLoading)
+    }
+
+    @Test
+    fun eraseModeIsAvailableOnlyWhenMapCanBeEdited() {
+        val editableState = MapUiState(
+            activeMapCityId = "ekb",
+            familyCityId = "ekb",
+            familyId = "family",
+            isParent = true
+        )
+
+        assertTrue(editableState.canEraseAreas)
+        assertFalse(editableState.copy(activeMapCityId = "salekhard").canEraseAreas)
+        assertFalse(editableState.copy(familyId = null).canEraseAreas)
+        assertFalse(editableState.copy(isParent = false).canEraseAreas)
+    }
+
+    @Test
+    fun colorSelectionAndCustomDraftStateClearEraseMode() {
+        val eraseState = MapUiState(
+            activeMapCityId = "ekb",
+            familyCityId = "ekb",
+            familyId = "family",
+            isParent = true,
+            isEraseMode = true,
+            activePaintColor = null,
+            isCreatingCustomArea = false
+        )
+
+        val colorSelectionState = eraseState.copy(
+            activePaintColor = MapAreaColor.RED,
+            isEraseMode = false,
+            isCreatingCustomArea = false,
+            draftPoints = emptyList()
+        )
+        assertEquals(MapAreaColor.RED, colorSelectionState.activePaintColor)
+        assertFalse(colorSelectionState.isEraseMode)
+
+        val draftState = eraseState.copy(
+            isCreatingCustomArea = true,
+            activePaintColor = null,
+            isEraseMode = false,
+            draftPoints = emptyList()
+        )
+        assertTrue(draftState.isCreatingCustomArea)
+        assertNull(draftState.activePaintColor)
+        assertFalse(draftState.isEraseMode)
     }
 }

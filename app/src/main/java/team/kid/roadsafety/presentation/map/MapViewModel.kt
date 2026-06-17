@@ -391,14 +391,47 @@ class MapViewModel @Inject constructor(
     fun onPaintColorSelected(color: MapAreaColor?) {
         if (!_uiState.value.canEditMap) return
 
-        _uiState.update { it.copy(activePaintColor = color, isCreatingCustomArea = false, draftPoints = emptyList()) }
+        _uiState.update {
+            it.copy(
+                activePaintColor = color,
+                isEraseMode = false,
+                isCreatingCustomArea = false,
+                draftPoints = emptyList()
+            )
+        }
+    }
+
+    fun onEraseModeToggled() {
+        if (!_uiState.value.canEditMap) return
+
+        _uiState.update {
+            it.copy(
+                isEraseMode = !it.isEraseMode,
+                activePaintColor = null,
+                isCreatingCustomArea = false,
+                draftPoints = emptyList()
+            )
+        }
     }
 
     fun onBaseAreaClicked(baseAreaKey: String) {
         if (!_uiState.value.canEditMap) return
 
+        if (_uiState.value.isEraseMode) {
+            resetBaseAreaColor(baseAreaKey)
+            return
+        }
+
         val paintColor = _uiState.value.activePaintColor ?: return
         updateBaseAreaColor(baseAreaKey, paintColor)
+    }
+
+    fun onCustomAreaClicked(areaId: String) {
+        val state = _uiState.value
+        if (!state.canEditMap || !state.isEraseMode) return
+
+        val area = state.customAreas.firstOrNull { it.id.value.toString() == areaId } ?: return
+        deleteCustomArea(area)
     }
 
     private fun updateBaseAreaColor(baseAreaKey: String, color: MapAreaColor) {
@@ -450,6 +483,48 @@ class MapViewModel @Inject constructor(
         }
     }
 
+    private fun resetBaseAreaColor(baseAreaKey: String) {
+        viewModelScope.launch {
+            val familyId = _uiState.value.familyId
+            if (familyId == null) {
+                _uiState.update { it.copy(error = "Family ID not found") }
+                return@launch
+            }
+
+            if (!networkMonitor.isOnline()) {
+                _uiState.update { it.copy(isOnline = false, error = "Network required to reset a zone") }
+                return@launch
+            }
+
+            val childId = _uiState.value.selectedZoneTarget.childUserId()
+            val previousColor = _uiState.value.overrides[baseAreaKey]
+            _uiState.update {
+                it.copy(
+                    isOnline = true,
+                    error = null,
+                    overrides = it.overrides - baseAreaKey
+                )
+            }
+
+            mapRepository.resetBaseAreaColor(baseAreaKey, familyId, childId)
+                .fold(
+                    onSuccess = {
+                        refreshMapEditsInBackground(familyId, childId)
+                    },
+                    onFailure = { error ->
+                        _uiState.update { state ->
+                            state.copy(
+                                overrides = previousColor?.let { color ->
+                                    state.overrides + (baseAreaKey to color)
+                                } ?: state.overrides,
+                                error = error.message ?: "Failed to reset zone"
+                            )
+                        }
+                    }
+                )
+        }
+    }
+
     fun changeCity(cityId: String) {
         viewModelScope.launch {
             val familyId = _uiState.value.familyId
@@ -489,6 +564,7 @@ class MapViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         activePaintColor = null,
+                        isEraseMode = false,
                         isCreatingCustomArea = false,
                         draftPoints = emptyList(),
                         error = null
@@ -513,7 +589,14 @@ class MapViewModel @Inject constructor(
     }
 
     fun dismissAreaSelection() {
-        _uiState.update { it.copy(activePaintColor = null, isCreatingCustomArea = false, draftPoints = emptyList()) }
+        _uiState.update {
+            it.copy(
+                activePaintColor = null,
+                isEraseMode = false,
+                isCreatingCustomArea = false,
+                draftPoints = emptyList()
+            )
+        }
     }
 
     fun onZoneTargetSelected(targetId: String) {
@@ -527,6 +610,7 @@ class MapViewModel @Inject constructor(
                 it.copy(
                     selectedZoneTarget = target,
                     activePaintColor = null,
+                    isEraseMode = false,
                     isCreatingCustomArea = false,
                     draftPoints = emptyList(),
                     error = null
@@ -552,6 +636,7 @@ class MapViewModel @Inject constructor(
             it.copy(
                 isCreatingCustomArea = true,
                 activePaintColor = null,
+                isEraseMode = false,
                 draftPoints = emptyList(),
                 draftRisk = MapAreaColor.YELLOW,
                 isOnline = isOnline,
@@ -562,7 +647,7 @@ class MapViewModel @Inject constructor(
 
     fun onMapPointClicked(point: GeoPoint) {
         val state = _uiState.value
-        if (!state.canEditMap || !state.isCreatingCustomArea) return
+        if (!state.canEditMap || state.isEraseMode || !state.isCreatingCustomArea) return
 
         _uiState.update { it.copy(draftPoints = it.draftPoints + point) }
     }
@@ -650,6 +735,49 @@ class MapViewModel @Inject constructor(
         }
     }
 
+    private fun deleteCustomArea(area: MapArea) {
+        viewModelScope.launch {
+            val familyId = _uiState.value.familyId
+            if (familyId == null) {
+                _uiState.update { it.copy(error = "Family ID not found") }
+                return@launch
+            }
+
+            if (!networkMonitor.isOnline()) {
+                _uiState.update { it.copy(isOnline = false, error = "Network required to delete a zone") }
+                return@launch
+            }
+
+            val childId = _uiState.value.selectedZoneTarget.childUserId()
+            _uiState.update {
+                it.copy(
+                    isOnline = true,
+                    error = null,
+                    customAreas = it.customAreas.filterNot { customArea -> customArea.id == area.id }
+                )
+            }
+
+            mapRepository.deleteCustomArea(area.id)
+                .fold(
+                    onSuccess = {
+                        refreshMapEditsInBackground(familyId, childId)
+                    },
+                    onFailure = { error ->
+                        _uiState.update { state ->
+                            state.copy(
+                                customAreas = if (state.customAreas.any { customArea -> customArea.id == area.id }) {
+                                    state.customAreas
+                                } else {
+                                    state.customAreas + area
+                                },
+                                error = error.message ?: "Failed to delete custom zone"
+                            )
+                        }
+                    }
+                )
+        }
+    }
+
     fun clearError() {
         _uiState.update { it.copy(error = null) }
     }
@@ -695,6 +823,7 @@ data class MapUiState(
     val zoneTargets: List<ZoneTarget> = listOf(ZoneTarget.AllFamily),
     val selectedZoneTarget: ZoneTarget = ZoneTarget.AllFamily,
     val activePaintColor: MapAreaColor? = null,
+    val isEraseMode: Boolean = false,
     val isCreatingCustomArea: Boolean = false,
     val draftPoints: List<GeoPoint> = emptyList(),
     val draftRisk: MapAreaColor = MapAreaColor.YELLOW,
@@ -716,6 +845,9 @@ data class MapUiState(
 
     val canSaveCustomArea: Boolean
         get() = canEditMap && isOnline && !isSavingCustomArea && draftPoints.distinct().size >= 3
+
+    val canEraseAreas: Boolean
+        get() = canEditMap
 }
 
 private fun MapCityBbox.contains(point: GeoPoint): Boolean {

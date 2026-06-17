@@ -645,6 +645,60 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ProblemDetails"
+    delete:
+      tags:
+        - Maps
+      summary: Reset a generated base area override
+      description: Deletes the family/child override for a generated base polygon. Returns 204 even when the override is already absent.
+      operationId: deleteBaseAreaOverride
+      parameters:
+        - name: familyId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: baseAreaKey
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Stable key from MapAreaProperties.baseAreaKey.
+        - name: childId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+            nullable: true
+          description: Omit to reset the family-wide override.
+      responses:
+        "204":
+          description: Base-area override removed or already absent
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestProblemDetails"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "403":
+          description: User is not allowed to edit this family map
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "404":
+          description: Family not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
 
   /maps/user-areas/custom:
     post:
@@ -686,6 +740,48 @@ paths:
                 $ref: "#/components/schemas/ProblemDetails"
         "404":
           description: Family not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+
+  /maps/user-areas/custom/{areaId}:
+    delete:
+      tags:
+        - Maps
+      summary: Delete a custom family user risk polygon
+      description: Deletes only custom user map areas. Any parent in the owning family may delete the polygon.
+      operationId: deleteCustomUserMapArea
+      parameters:
+        - name: areaId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Custom user risk area deleted
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestProblemDetails"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "403":
+          description: User is not allowed to edit this family map
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "404":
+          description: Custom map area not found
           content:
             application/json:
               schema:

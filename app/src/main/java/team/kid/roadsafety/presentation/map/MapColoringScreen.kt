@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddLocationAlt
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material3.Card
@@ -261,7 +262,22 @@ fun MapColoringScreen(
                 source = customGeoJsonSource,
                 color = customAreaColorExpression(),
                 opacity = const(0.45f),
-                outlineColor = const(Color(0xFF263238))
+                outlineColor = const(Color(0xFF263238)),
+                onClick = { clickedFeatures ->
+                    val areaId = clickedFeatures
+                        .firstOrNull()
+                        ?.properties
+                        ?.get("id")
+                        ?.jsonPrimitive
+                        ?.contentOrNull
+
+                    if (areaId != null && state.isEraseMode) {
+                        viewModel.onCustomAreaClicked(areaId)
+                        ClickResult.Consume
+                    } else {
+                        ClickResult.Pass
+                    }
+                }
             )
 
             val draftGeoJsonData = remember(draftFillSource) {
@@ -349,7 +365,9 @@ fun MapColoringScreen(
 
             PaintPanel(
                 selectedColor = state.activePaintColor,
+                isEraseMode = state.isEraseMode,
                 onColorSelected = viewModel::onPaintColorSelected,
+                onEraseModeToggled = viewModel::onEraseModeToggled,
                 onCreateCustomArea = viewModel::startCustomAreaDraft,
                 isCreatingCustomArea = state.isCreatingCustomArea,
                 modifier = Modifier
@@ -599,7 +617,9 @@ private fun ZoneTargetDropdown(
 @Composable
 fun PaintPanel(
     selectedColor: MapAreaColor?,
+    isEraseMode: Boolean,
     onColorSelected: (MapAreaColor?) -> Unit,
+    onEraseModeToggled: () -> Unit,
     onCreateCustomArea: () -> Unit,
     isCreatingCustomArea: Boolean,
     modifier: Modifier = Modifier
@@ -659,6 +679,26 @@ fun PaintPanel(
                     style = MaterialTheme.typography.labelSmall,
                     color = if (selectedColor == null)
                         MaterialTheme.colorScheme.onPrimaryContainer
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            FilledIconButton(
+                onClick = onEraseModeToggled,
+                modifier = Modifier.size(40.dp),
+                colors = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = if (isEraseMode)
+                        MaterialTheme.colorScheme.errorContainer
+                    else
+                        MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Delete,
+                    contentDescription = "Удалить или сбросить зону",
+                    tint = if (isEraseMode)
+                        MaterialTheme.colorScheme.onErrorContainer
                     else
                         MaterialTheme.colorScheme.onSurfaceVariant
                 )

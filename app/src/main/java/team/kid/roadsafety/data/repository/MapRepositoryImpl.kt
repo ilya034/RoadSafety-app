@@ -160,6 +160,38 @@ class MapRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun resetBaseAreaColor(baseAreaKey: String, familyId: String, childId: UserId?): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.resetBaseAreaColor(
+                familyId = familyId,
+                baseAreaKey = baseAreaKey,
+                childId = childId?.value?.toString()
+            )
+            if (response.isSuccessful) {
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception(response.parseErrorMessage("Failed to reset area color")))
+            }
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun deleteCustomArea(areaId: AreaId): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.deleteCustomArea(areaId.value.toString())
+            if (response.isSuccessful) {
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception(response.parseErrorMessage("Failed to delete custom zone")))
+            }
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            Result.failure(e)
+        }
+    }
+
     private fun team.kid.roadsafety.data.dto.UserMapAreaFeatureDto.toMapArea(): MapArea {
         return MapArea(
             id = AreaId(UUID.fromString(properties.id)),
