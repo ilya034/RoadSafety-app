@@ -18,11 +18,13 @@ import androidx.compose.material.icons.filled.AddLocationAlt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Undo
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -100,7 +102,7 @@ fun MapColoringScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val cameraState = rememberCameraState(
-        firstPosition = CameraPosition(
+        firstPosition = state.lastCameraPosition ?: CameraPosition(
             target = Position(60.6122, 56.8519),
             zoom = 12.0
         )
@@ -137,6 +139,15 @@ fun MapColoringScreen(
             .collectLatest { center ->
                 delay(400L)
                 viewModel.viewCityForCamera(center)
+            }
+    }
+
+    LaunchedEffect(cameraState) {
+        snapshotFlow { cameraState.position }
+            .distinctUntilChanged()
+            .collectLatest { position ->
+                delay(500L)
+                viewModel.updateCameraPosition(position)
             }
     }
 
@@ -200,6 +211,7 @@ fun MapColoringScreen(
     }
 
     LaunchedEffect(state.activeMapCityId, state.familyCityId, state.metadata?.bbox, state.cities) {
+        if (state.lastCameraPosition != null) return@LaunchedEffect
         val bbox = state.metadata?.bbox
             ?: state.cities.firstOrNull { it.cityId == state.activeMapCityId }?.bbox
         if (bbox != null) {
@@ -407,6 +419,28 @@ fun MapColoringScreen(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(16.dp)
+                )
+            }
+        }
+
+        Card(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 80.dp, end = 16.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)
+            ),
+            shape = CircleShape
+        ) {
+            IconButton(
+                onClick = viewModel::forceRefresh,
+                enabled = !state.isLoading,
+                modifier = Modifier.size(48.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Refresh,
+                    contentDescription = "Обновить карту"
                 )
             }
         }

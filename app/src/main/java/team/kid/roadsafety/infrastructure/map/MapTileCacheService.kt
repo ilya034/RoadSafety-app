@@ -106,6 +106,11 @@ class MapTileCacheService @Inject constructor(
         }
     }
 
+    fun clearWarmedCityVersion(cityId: String) {
+        val key = "warmed_${cityId}"
+        stylePrefs.edit().remove(key).apply()
+    }
+
     suspend fun refreshMapCache(
         cityId: String,
         generationVersion: String,
@@ -115,6 +120,12 @@ class MapTileCacheService @Inject constructor(
     ) {
         configureAmbientCache()
         if (bbox == null) return
+
+        val key = "warmed_${cityId}"
+        val savedVersion = stylePrefs.getString(key, null)
+        if (savedVersion == generationVersion) {
+            return
+        }
 
         withContext(Dispatchers.Main) {
             offlineManager.setOfflineMapboxTileCountLimit(OfflineTileLimit)
@@ -127,6 +138,8 @@ class MapTileCacheService @Inject constructor(
         }
 
         warmSafetyTiles(tileUrlTemplate, bbox, generationVersion)
+
+        stylePrefs.edit().putString(key, generationVersion).apply()
     }
 
     private suspend fun createOfflineRegion(
@@ -290,7 +303,7 @@ class MapTileCacheService @Inject constructor(
         const val BaseMapMinZoom = 9.0
         const val BaseMapMaxZoom = 18.0
         const val SafetyTileMinZoom = 9
-        const val SafetyTileMaxZoom = 15
+        const val SafetyTileMaxZoom = 13
         const val SafetyTileWarmLimit = 400
         const val SafetyTileTtlSeconds = 24L * 60L * 60L
         const val AmbientCacheBytes = 250L * 1024L * 1024L

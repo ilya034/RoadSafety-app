@@ -29,6 +29,7 @@ import team.kid.roadsafety.data.dto.MapCityMetadataDto
 import team.kid.roadsafety.data.dto.NotificationsResponseDto
 import team.kid.roadsafety.data.dto.RefreshTokensRequestDto
 import team.kid.roadsafety.data.dto.RefreshTokensResponseDto
+import team.kid.roadsafety.data.dto.RegisterDeviceTokenRequestDto
 import team.kid.roadsafety.data.dto.RegisterRequestDto
 import team.kid.roadsafety.data.dto.SubmitLocationRequestDto
 import team.kid.roadsafety.data.dto.SubmitLocationResponseDto
@@ -135,4 +136,10 @@ interface RoadSafetyApi {
 
     @POST("notifications/{id}/read")
     suspend fun markNotificationRead(@Path("id") id: String): Response<Unit>
+
+    @POST("notifications/device-tokens")
+    suspend fun registerDeviceToken(@Body request: RegisterDeviceTokenRequestDto): Response<Unit>
+
+    @DELETE("notifications/device-tokens/{token}")
+    suspend fun deleteDeviceToken(@Path("token") token: String): Response<Unit>
 }

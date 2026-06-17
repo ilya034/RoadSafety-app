@@ -11,12 +11,14 @@ import kotlinx.coroutines.launch
 import team.kid.roadsafety.data.dto.UserResponseDto
 import team.kid.roadsafety.domain.aggregates.user.AuthRepository
 import team.kid.roadsafety.domain.aggregates.user.UserRole
+import team.kid.roadsafety.infrastructure.push.PushTokenSynchronizer
 import javax.inject.Inject
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val authRepository: AuthRepository,
-    private val familyRepository: team.kid.roadsafety.domain.aggregates.family.FamilyRepository
+    private val familyRepository: team.kid.roadsafety.domain.aggregates.family.FamilyRepository,
+    private val pushTokenSynchronizer: PushTokenSynchronizer
 ) : ViewModel() {
 
     private val _authState = MutableStateFlow<AuthState>(AuthState.Loading)
@@ -35,6 +37,7 @@ class MainViewModel @Inject constructor(
             val tokens = authRepository.getTokens()
             Log.d("MainViewModel", "Checking auth, tokens found: ${tokens != null}")
             if (tokens != null) {
+                pushTokenSynchronizer.syncCurrentTokenIfAuthenticated()
                 fetchUserProfile()
             } else {
                 _authState.value = AuthState.Unauthenticated

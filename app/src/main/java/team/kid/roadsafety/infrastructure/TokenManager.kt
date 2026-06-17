@@ -51,7 +51,23 @@ class TokenManager @Inject constructor(
     }
 
     fun clearTokens() {
-        prefs.edit().clear().apply()
+        prefs.edit()
+            .remove("access_token")
+            .remove("refresh_token")
+            .remove("cached_user")
+            .apply()
+    }
+
+    fun saveFcmToken(token: String) {
+        prefs.edit().putString("fcm_token", token).apply()
+    }
+
+    fun getFcmToken(): String? {
+        return prefs.getString("fcm_token", null)
+    }
+
+    fun hasAuthTokens(): Boolean {
+        return getTokens() != null
     }
 }
 

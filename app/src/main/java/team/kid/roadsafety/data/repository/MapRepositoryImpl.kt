@@ -166,7 +166,7 @@ class MapRepositoryImpl @Inject constructor(
                 baseAreaKey = baseAreaKey,
                 childId = childId?.value?.toString()
             )
-            if (response.isSuccessful) {
+            if (response.isSuccessful || response.code() == 404) {
                 Result.success(Unit)
             } else {
                 Result.failure(Exception(response.parseErrorMessage("Failed to reset area color")))
@@ -180,7 +180,7 @@ class MapRepositoryImpl @Inject constructor(
     override suspend fun deleteCustomArea(areaId: AreaId): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val response = api.deleteCustomArea(areaId.value.toString())
-            if (response.isSuccessful) {
+            if (response.isSuccessful || response.code() == 404) {
                 Result.success(Unit)
             } else {
                 Result.failure(Exception(response.parseErrorMessage("Failed to delete custom zone")))

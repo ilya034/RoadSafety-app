@@ -67,3 +67,14 @@ data class NotificationDto(
 enum class NotificationTypeDto {
     ChildEnteredRedZone
 }
+
+@Serializable
+data class RegisterDeviceTokenRequestDto(
+    val token: String,
+    val platform: DevicePlatformDto = DevicePlatformDto.Android
+)
+
+@Serializable
+enum class DevicePlatformDto {
+    Android
+}

@@ -12,6 +12,8 @@ import java.time.Instant
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
+class NonRetriableException(message: String) : Exception(message)
+
 class TrackingRepositoryImpl @Inject constructor(
     private val api: RoadSafetyApi,
     private val pendingLocationLocalDataSource: PendingLocationLocalDataSource
@@ -31,13 +33,19 @@ class TrackingRepositoryImpl @Inject constructor(
         return submitMutex.withLock {
             val flushResult = flushPendingLocations()
             if (flushResult.isFailure) {
-                pendingLocationLocalDataSource.enqueue(request)
+                val exception = flushResult.exceptionOrNull()
+                if (exception !is NonRetriableException) {
+                    pendingLocationLocalDataSource.enqueue(request)
+                }
                 return@withLock Result.failure(flushResult.exceptionOrNull() ?: Exception("Failed to submit pending locations"))
             }
 
             val currentResult = submitLocation(request)
             if (currentResult.isFailure) {
-                pendingLocationLocalDataSource.enqueue(request)
+                val exception = currentResult.exceptionOrNull()
+                if (exception !is NonRetriableException) {
+                    pendingLocationLocalDataSource.enqueue(request)
+                }
             }
             currentResult
         }
@@ -46,17 +54,23 @@ class TrackingRepositoryImpl @Inject constructor(
     private suspend fun flushPendingLocations(): Result<Unit> {
         val pendingLocations = pendingLocationLocalDataSource.getPendingLocations()
         var submittedCount = 0
+        var droppedCount = 0
 
         for (location in pendingLocations) {
             val result = submitLocation(location)
             if (result.isFailure) {
-                pendingLocationLocalDataSource.removeFirst(submittedCount)
-                return Result.failure(result.exceptionOrNull() ?: Exception("Failed to submit pending location"))
+                val exception = result.exceptionOrNull()
+                if (exception is NonRetriableException) {
+                    droppedCount++
+                    continue
+                }
+                pendingLocationLocalDataSource.removeFirst(submittedCount + droppedCount)
+                return Result.failure(exception ?: Exception("Failed to submit pending location"))
             }
             submittedCount++
         }
 
-        pendingLocationLocalDataSource.removeFirst(submittedCount)
+        pendingLocationLocalDataSource.removeFirst(submittedCount + droppedCount)
         return Result.success(Unit)
     }
 
@@ -66,7 +80,13 @@ class TrackingRepositoryImpl @Inject constructor(
             if (response.isSuccessful) {
                 Result.success(response.body()!!)
             } else {
-                Result.failure(Exception(response.parseErrorMessage("Failed to submit location")))
+                val code = response.code()
+                val message = response.parseErrorMessage("Failed to submit location")
+                if (code in 400..499 && code != 408 && code != 429) {
+                    Result.failure(NonRetriableException(message))
+                } else {
+                    Result.failure(Exception(message))
+                }
             }
         } catch (e: Exception) {
             Result.failure(e)

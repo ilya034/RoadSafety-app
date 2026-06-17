@@ -32,6 +32,7 @@ import team.kid.roadsafety.infrastructure.location.WarningAlertEvents
 import team.kid.roadsafety.presentation.auth.AuthNavigation
 import team.kid.roadsafety.presentation.family.FamilyOnboardingScreen
 import team.kid.roadsafety.presentation.map.MapColoringScreen
+import team.kid.roadsafety.presentation.notifications.NotificationsScreen
 import team.kid.roadsafety.presentation.profile.ProfileScreen
 
 @Composable
@@ -145,6 +146,11 @@ fun MainScreen(
                 AppDestinations.PROFILE -> {
                     ProfileScreen(
                         onLogout = onLogout,
+                        modifier = Modifier.padding(innerPadding)
+                    )
+                }
+                AppDestinations.NOTIFICATIONS -> {
+                    NotificationsScreen(
                         modifier = Modifier.padding(innerPadding)
                     )
                 }

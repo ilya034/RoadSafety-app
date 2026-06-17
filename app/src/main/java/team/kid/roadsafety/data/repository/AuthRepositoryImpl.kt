@@ -9,11 +9,13 @@ import team.kid.roadsafety.domain.aggregates.session.AuthTokens
 import team.kid.roadsafety.domain.aggregates.user.AuthRepository
 import team.kid.roadsafety.infrastructure.TokenManager
 import team.kid.roadsafety.infrastructure.parseErrorMessage
+import team.kid.roadsafety.infrastructure.push.PushTokenSynchronizer
 import javax.inject.Inject
 
 class AuthRepositoryImpl @Inject constructor(
     private val api: RoadSafetyApi,
-    private val tokenManager: TokenManager
+    private val tokenManager: TokenManager,
+    private val pushTokenSynchronizer: PushTokenSynchronizer
 ) : AuthRepository {
 
     override suspend fun login(login: String, password: String): Result<AuthResponseDto> {
@@ -23,6 +25,7 @@ class AuthRepositoryImpl @Inject constructor(
                 val body = response.body()!!
                 val tokens = AuthTokens(body.accessToken, body.refreshToken)
                 tokenManager.saveTokens(tokens)
+                pushTokenSynchronizer.syncCurrentTokenIfAuthenticated()
                 Result.success(body)
             } else {
                 Result.failure(Exception(response.parseErrorMessage("Login failed")))
@@ -46,6 +49,7 @@ class AuthRepositoryImpl @Inject constructor(
                 val body = response.body()!!
                 val tokens = AuthTokens(body.accessToken, body.refreshToken)
                 tokenManager.saveTokens(tokens)
+                pushTokenSynchronizer.syncCurrentTokenIfAuthenticated()
                 Result.success(body)
             } else {
                 Result.failure(Exception(response.parseErrorMessage("Registration failed")))
@@ -76,6 +80,7 @@ class AuthRepositoryImpl @Inject constructor(
     }
 
     override suspend fun logout(): Result<Unit> {
+        pushTokenSynchronizer.deleteCurrentTokenBestEffort()
         tokenManager.clearTokens()
         return Result.success(Unit)
     }

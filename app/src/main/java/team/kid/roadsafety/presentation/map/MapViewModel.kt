@@ -31,6 +31,7 @@ import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.util.UUID
 import javax.inject.Inject
+import org.maplibre.compose.camera.CameraPosition
 
 @HiltViewModel
 class MapViewModel @Inject constructor(
@@ -545,7 +546,7 @@ class MapViewModel @Inject constructor(
             val familyId = _uiState.value.familyId
             if (familyId == null) {
                 familyRepository.setSelectedCityId(cityId)
-                _uiState.update { it.copy(familyCityId = cityId, overrides = emptyMap(), customAreas = emptyList()) }
+                _uiState.update { it.copy(familyCityId = cityId, overrides = emptyMap(), customAreas = emptyList(), lastCameraPosition = null) }
                 loadCity(cityId, null)
                 return@launch
             }
@@ -557,7 +558,7 @@ class MapViewModel @Inject constructor(
             )
             result.fold(
                 onSuccess = {
-                    _uiState.update { it.copy(familyCityId = cityId, overrides = emptyMap(), customAreas = emptyList()) }
+                    _uiState.update { it.copy(familyCityId = cityId, overrides = emptyMap(), customAreas = emptyList(), lastCameraPosition = null) }
                     loadCity(cityId, familyId)
                 },
                 onFailure = { error ->
@@ -582,6 +583,7 @@ class MapViewModel @Inject constructor(
                         isEraseMode = false,
                         isCreatingCustomArea = false,
                         draftPoints = emptyList(),
+                        lastCameraPosition = null,
                         error = null
                     )
                 }
@@ -808,6 +810,23 @@ class MapViewModel @Inject constructor(
         viewModelScope.launch { syncAlertZones(_uiState.value.activeMapCityId, familyId, childId) }
     }
 
+    fun updateCameraPosition(position: CameraPosition) {
+        _uiState.update { it.copy(lastCameraPosition = position) }
+    }
+
+    fun forceRefresh() {
+        val state = _uiState.value
+        val cityId = state.activeMapCityId
+        val familyId = state.familyId
+
+        _uiState.update { it.copy(isLoading = true, error = null) }
+
+        viewModelScope.launch {
+            mapTileCacheService.clearWarmedCityVersion(cityId)
+            loadCity(cityId, familyId)
+        }
+    }
+
     private companion object {
         const val DefaultCityId = "ekb"
         val BaseMapStyleUrl = "https://api.maptiler.com/maps/streets-v2/style.json?key=${BuildConfig.MAPTILER_KEY}"
@@ -848,7 +867,8 @@ data class MapUiState(
     val error: String? = null,
     val currentLocation: GeoPoint? = null,
     val childLocations: List<ChildMapLocation> = emptyList(),
-    val currentChildId: team.kid.roadsafety.domain.UserId? = null
+    val currentChildId: team.kid.roadsafety.domain.UserId? = null,
+    val lastCameraPosition: CameraPosition? = null
 ) {
     val currentRequestChildId: team.kid.roadsafety.domain.UserId?
         get() = if (isParent) selectedZoneTarget.childUserId() else currentChildId

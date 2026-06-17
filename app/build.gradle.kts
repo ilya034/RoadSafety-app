@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.google.services)
 }
 
 val localProperties = Properties().apply {
@@ -72,6 +73,7 @@ dependencies {
     implementation(libs.androidx.compose.material3.adaptive.navigation.suite)
     implementation(libs.androidx.compose.material.icons.core)
     implementation(libs.androidx.compose.material.icons.extended)
+    implementation(libs.firebase.messaging.ktx)
     implementation(libs.maplibre.compose)
     implementation(libs.maplibre.android)
 
@@ -84,6 +86,7 @@ dependencies {
     implementation(libs.hilt.navigation.compose)
     ksp(libs.hilt.compiler)
     implementation(libs.play.services.location)
+    implementation(libs.play.services.tasks)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
