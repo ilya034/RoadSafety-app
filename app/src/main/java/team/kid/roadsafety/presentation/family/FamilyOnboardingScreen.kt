@@ -1,9 +1,24 @@
 package team.kid.roadsafety.presentation.family
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -11,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import team.kid.roadsafety.domain.aggregates.map.MapCity
 import team.kid.roadsafety.domain.aggregates.user.UserRole
 import team.kid.roadsafety.presentation.auth.AuthButton
 import team.kid.roadsafety.presentation.auth.AuthTextField
@@ -36,6 +52,11 @@ fun FamilyOnboardingScreen(
         CreateFamilyContent(
             familyName = state.familyName,
             onFamilyNameChange = viewModel::onFamilyNameChanged,
+            cities = state.cities,
+            cityQuery = state.cityQuery,
+            selectedCity = state.selectedCity,
+            onCityQueryChange = viewModel::onCityQueryChanged,
+            onCitySelected = viewModel::onCitySelected,
             onCreateClick = { viewModel.createFamily(onSuccess) },
             onJoinClick = { isJoining = true },
             userRole = state.userRole,
@@ -49,6 +70,11 @@ fun FamilyOnboardingScreen(
 fun CreateFamilyContent(
     familyName: String,
     onFamilyNameChange: (String) -> Unit,
+    cities: List<MapCity>,
+    cityQuery: String,
+    selectedCity: MapCity?,
+    onCityQueryChange: (String) -> Unit,
+    onCitySelected: (MapCity) -> Unit,
     onCreateClick: () -> Unit,
     onJoinClick: () -> Unit,
     userRole: UserRole,
@@ -58,6 +84,7 @@ fun CreateFamilyContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(Color.White)
             .padding(horizontal = 40.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
@@ -78,10 +105,19 @@ fun CreateFamilyContent(
                 modifier = Modifier.padding(bottom = 24.dp)
             )
 
+            CitySearchDropdown(
+                cities = cities,
+                query = cityQuery,
+                selectedCity = selectedCity,
+                onQueryChange = onCityQueryChange,
+                onCitySelected = onCitySelected,
+                modifier = Modifier.padding(bottom = 24.dp)
+            )
+
             AuthButton(
                 text = "Создать семью",
                 isLoading = isLoading,
-                enabled = familyName.isNotBlank(),
+                enabled = familyName.isNotBlank() && selectedCity != null,
                 onClick = onCreateClick,
                 modifier = Modifier.padding(bottom = 20.dp)
             )
@@ -107,6 +143,62 @@ fun CreateFamilyContent(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CitySearchDropdown(
+    cities: List<MapCity>,
+    query: String,
+    selectedCity: MapCity?,
+    onQueryChange: (String) -> Unit,
+    onCitySelected: (MapCity) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val filteredCities = remember(cities, query) { filterCities(cities, query) }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded && filteredCities.isNotEmpty(),
+        onExpandedChange = { expanded = it },
+        modifier = modifier.fillMaxWidth()
+    ) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = {
+                expanded = true
+                onQueryChange(it)
+            },
+            singleLine = true,
+            label = { Text("Город") },
+            trailingIcon = {
+                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+            },
+            modifier = Modifier
+                .menuAnchor()
+                .fillMaxWidth()
+        )
+
+        ExposedDropdownMenu(
+            expanded = expanded && filteredCities.isNotEmpty(),
+            onDismissRequest = { expanded = false }
+        ) {
+            filteredCities.forEach { city ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = city.name,
+                            color = if (city == selectedCity) Color.Gray else Color.Unspecified
+                        )
+                    },
+                    onClick = {
+                        onCitySelected(city)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
 @Composable
 fun JoinFamilyContent(
     inviteCode: String,
@@ -119,6 +211,7 @@ fun JoinFamilyContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(Color.White)
             .padding(horizontal = 40.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center

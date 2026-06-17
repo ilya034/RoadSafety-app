@@ -1,18 +1,44 @@
 package team.kid.roadsafety.presentation.profile
 
+import android.widget.Toast
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ExitToApp
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -32,6 +58,10 @@ fun ProfileScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
 
+    LaunchedEffect(Unit) {
+        viewModel.loadProfile()
+    }
+
     Box(modifier = modifier.fillMaxSize().background(Color.White)) {
         if (state.isLoading && state.user == null) {
             CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
@@ -49,12 +79,17 @@ fun ProfileScreen(
                         PersonalInfoSection(user = user, members = state.members)
                     }
 
+                    val currentUserRole = state.members.find { it.userId == user.id }?.role ?: UserRole.fromString(user.familyRole)
+                    val isChild = currentUserRole == UserRole.CHILD
+
                     val children = state.members.filter { it.role == UserRole.CHILD }
                     item {
                         MembersSection(
                             title = "Дети",
                             members = children,
-                            onAddClick = { viewModel.generateInviteCode(UserRole.CHILD) }
+                            onAddClick = if (!isChild) {
+                                { viewModel.generateInviteCode(UserRole.CHILD) }
+                            } else null
                         )
                     }
 
@@ -63,7 +98,9 @@ fun ProfileScreen(
                         MembersSection(
                             title = "Все родители",
                             members = parents,
-                            onAddClick = { viewModel.generateInviteCode(UserRole.PARENT) }
+                            onAddClick = if (!isChild) {
+                                { viewModel.generateInviteCode(UserRole.PARENT) }
+                            } else null
                         )
                     }
                 }
@@ -197,7 +234,7 @@ fun InfoRow(label: String, value: String) {
 }
 
 @Composable
-fun MembersSection(title: String, members: List<FamilyMemberEntity>, onAddClick: () -> Unit) {
+fun MembersSection(title: String, members: List<FamilyMemberEntity>, onAddClick: (() -> Unit)? = null) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = Color.Gray.copy(alpha = 0.8f),
@@ -216,11 +253,13 @@ fun MembersSection(title: String, members: List<FamilyMemberEntity>, onAddClick:
                 Spacer(modifier = Modifier.height(8.dp))
             }
             
-            IconButton(
-                onClick = onAddClick, 
-                modifier = Modifier.align(Alignment.CenterHorizontally).background(Color.White, CircleShape).size(30.dp)
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.Gray)
+            if (onAddClick != null) {
+                IconButton(
+                    onClick = onAddClick, 
+                    modifier = Modifier.align(Alignment.CenterHorizontally).background(Color.White, CircleShape).size(30.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.Gray)
+                }
             }
         }
     }
@@ -238,7 +277,7 @@ fun MemberItem(member: FamilyMemberEntity) {
             Surface(modifier = Modifier.size(40.dp), shape = CircleShape, color = Color.White) {}
             Spacer(modifier = Modifier.width(12.dp))
             Column {
-                Text(text = "User ${member.userId}", color = Color.White, fontWeight = FontWeight.Bold)
+                Text(text = member.displayLabel, color = Color.White, fontWeight = FontWeight.Bold)
                 Text(text = if (member.role == UserRole.PARENT) "Родитель" else "Ребенок", color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
             }
         }
@@ -247,6 +286,9 @@ fun MemberItem(member: FamilyMemberEntity) {
 
 @Composable
 fun InviteCodeDialog(code: String, onDismiss: () -> Unit) {
+    val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
+
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(16.dp),
@@ -266,6 +308,10 @@ fun InviteCodeDialog(code: String, onDismiss: () -> Unit) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     code,
+                    modifier = Modifier.clickable {
+                        clipboardManager.setText(AnnotatedString(code))
+                        Toast.makeText(context, "Код скопирован", Toast.LENGTH_SHORT).show()
+                    },
                     fontSize = 32.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = ButtonGreen,
