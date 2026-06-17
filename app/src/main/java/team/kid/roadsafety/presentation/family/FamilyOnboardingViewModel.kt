@@ -92,7 +92,7 @@ class FamilyOnboardingViewModel @Inject constructor(
         viewModelScope.launch {
             val selectedCity = _uiState.value.selectedCity
             if (selectedCity == null) {
-                _uiState.update { it.copy(error = "Select city") }
+                _uiState.update { it.copy(error = "Выберите город") }
                 return@launch
             }
 
@@ -137,5 +137,16 @@ data class FamilyOnboardingUiState(
     val isLoading: Boolean = false,
     val error: String? = null
 )
+
+fun filterCities(cities: List<MapCity>, query: String): List<MapCity> {
+    return if (query.isBlank()) {
+        cities
+    } else {
+        cities.filter {
+            it.name.contains(query, ignoreCase = true) ||
+                it.cityId.contains(query, ignoreCase = true)
+        }
+    }
+}
 
 private val FallbackCity = MapCity(cityId = "ekb", name = "Екатеринбург")

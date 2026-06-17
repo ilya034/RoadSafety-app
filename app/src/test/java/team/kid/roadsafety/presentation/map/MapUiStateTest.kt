@@ -103,4 +103,31 @@ class MapUiStateTest {
 
         assertEquals(listOf(newLocation), state.visibleChildLocations)
     }
+
+    @Test
+    fun changingViewedCityDisablesEditingUntilFamilyCityIsActiveAgain() {
+        val state = MapUiState(
+            activeMapCityId = "salekhard",
+            familyCityId = "ekb",
+            familyId = "family",
+            isParent = true
+        )
+
+        assertFalse(state.canEditMap)
+        assertTrue(state.copy(activeMapCityId = "ekb").canEditMap)
+    }
+
+    @Test
+    fun activeCityCanChangeWithoutGlobalLoadingState() {
+        val state = MapUiState(
+            activeMapCityId = "ekb",
+            familyCityId = "ekb",
+            isLoading = false
+        )
+
+        val viewedCityState = state.copy(activeMapCityId = "salekhard")
+
+        assertEquals("salekhard", viewedCityState.activeMapCityId)
+        assertFalse(viewedCityState.isLoading)
+    }
 }

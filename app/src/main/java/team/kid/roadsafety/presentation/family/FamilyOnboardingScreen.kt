@@ -2,13 +2,15 @@ package team.kid.roadsafety.presentation.family
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -86,7 +88,7 @@ fun CreateFamilyContent(
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "РЎРµРјСЊСЏ",
+            text = "Семья",
             fontSize = 36.sp,
             fontWeight = FontWeight.Bold,
             color = Color.Gray,
@@ -97,7 +99,7 @@ fun CreateFamilyContent(
             AuthTextField(
                 value = familyName,
                 onValueChange = onFamilyNameChange,
-                placeholder = "РќР°Р·РІР°РЅРёРµ СЃРµРјСЊРё",
+                placeholder = "Название семьи",
                 modifier = Modifier.padding(bottom = 24.dp)
             )
 
@@ -111,7 +113,7 @@ fun CreateFamilyContent(
             )
 
             AuthButton(
-                text = "РЎРѕР·РґР°С‚СЊ СЃРµРјСЊСЋ",
+                text = "Создать семью",
                 isLoading = isLoading,
                 enabled = familyName.isNotBlank() && selectedCity != null,
                 onClick = onCreateClick,
@@ -120,7 +122,7 @@ fun CreateFamilyContent(
         }
 
         Text(
-            text = "Р’РѕР№С‚Рё РІ СЃРµРјСЊСЋ",
+            text = "Войти в семью",
             color = Color.Gray,
             fontSize = 18.sp,
             modifier = Modifier
@@ -139,6 +141,7 @@ fun CreateFamilyContent(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CitySearchDropdown(
     cities: List<MapCity>,
@@ -149,32 +152,32 @@ private fun CitySearchDropdown(
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val filteredCities = remember(cities, query) {
-        if (query.isBlank()) {
-            cities
-        } else {
-            cities.filter {
-                it.name.contains(query, ignoreCase = true) ||
-                    it.cityId.contains(query, ignoreCase = true)
-            }
-        }
-    }
+    val filteredCities = remember(cities, query) { filterCities(cities, query) }
 
-    Box(modifier = modifier.fillMaxWidth()) {
-        AuthTextField(
+    ExposedDropdownMenuBox(
+        expanded = expanded && filteredCities.isNotEmpty(),
+        onExpandedChange = { expanded = it },
+        modifier = modifier.fillMaxWidth()
+    ) {
+        OutlinedTextField(
             value = query,
             onValueChange = {
                 expanded = true
                 onQueryChange(it)
             },
-            placeholder = "Город",
-            modifier = Modifier.clickable { expanded = true }
+            singleLine = true,
+            label = { Text("Город") },
+            trailingIcon = {
+                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+            },
+            modifier = Modifier
+                .menuAnchor()
+                .fillMaxWidth()
         )
 
-        DropdownMenu(
+        ExposedDropdownMenu(
             expanded = expanded && filteredCities.isNotEmpty(),
-            onDismissRequest = { expanded = false },
-            modifier = Modifier.fillMaxWidth(0.78f)
+            onDismissRequest = { expanded = false }
         ) {
             filteredCities.forEach { city ->
                 DropdownMenuItem(
@@ -211,7 +214,7 @@ fun JoinFamilyContent(
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "Р’РІРµРґРёС‚Рµ РєРѕРґ",
+            text = "Введите код",
             fontSize = 36.sp,
             fontWeight = FontWeight.Bold,
             color = Color.Gray,
@@ -221,7 +224,7 @@ fun JoinFamilyContent(
         AuthTextField(
             value = inviteCode,
             onValueChange = onInviteCodeChange,
-            placeholder = "РљРѕРґ РїСЂРёРіР»Р°С€РµРЅРёСЏ",
+            placeholder = "Код приглашения",
             modifier = Modifier.padding(bottom = 24.dp)
         )
 
@@ -234,7 +237,7 @@ fun JoinFamilyContent(
         )
 
         Text(
-            text = "РќР°Р·Р°Рґ",
+            text = "Назад",
             color = Color.Gray,
             fontSize = 18.sp,
             modifier = Modifier

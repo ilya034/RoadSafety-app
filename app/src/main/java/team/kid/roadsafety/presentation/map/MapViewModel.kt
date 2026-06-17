@@ -50,6 +50,7 @@ class MapViewModel @Inject constructor(
     private var childrenLocationPollingJob: Job? = null
     private var alertZonesSyncJob: Job? = null
     private var currentLocationJob: Job? = null
+    private var cityLoadJob: Job? = null
     private var requestedMapCityId: String? = null
 
     fun refreshForCurrentUser() {
@@ -68,6 +69,8 @@ class MapViewModel @Inject constructor(
         alertZonesSyncJob = null
         currentLocationJob?.cancel()
         currentLocationJob = null
+        cityLoadJob?.cancel()
+        cityLoadJob = null
     }
 
     private suspend fun initializeMap() {
@@ -201,6 +204,16 @@ class MapViewModel @Inject constructor(
 
         currentLocationJob = viewModelScope.launch {
             try {
+                locationObserver.getLastKnownLocation()?.let { location ->
+                    _uiState.update {
+                        it.copy(
+                            currentLocation = GeoPoint(
+                                latitude = location.latitude,
+                                longitude = location.longitude
+                            )
+                        )
+                    }
+                }
                 locationObserver.observeLocation(5000L).collect { location ->
                     val point = GeoPoint(
                         latitude = location.latitude,
@@ -209,7 +222,7 @@ class MapViewModel @Inject constructor(
                     _uiState.update { it.copy(currentLocation = point) }
                 }
             } catch (e: Exception) {
-                // Permissions might not be granted. Ignore gracefully.
+                _uiState.update { it.copy(error = "Нет доступа к местоположению") }
             }
         }
     }
@@ -340,16 +353,22 @@ class MapViewModel @Inject constructor(
         val cachedCustomAreas = cachedAreas
             ?.filter { area -> area.baseAreaKey == null && area.points.isNotEmpty() }
 
-        if (cachedMetadata != null || cachedOverrides != null) {
+        if (cachedMetadata != null) {
             _uiState.update {
                 it.copy(
-                    isLoading = cachedMetadata == null,
+                    isLoading = false,
                     activeMapCityId = cityId,
-                    metadata = cachedMetadata ?: it.metadata,
-                    tileUrl = cachedMetadata?.let { metadata ->
-                        buildTileUrl(cityId, metadata.generationVersion)
-                    } ?: it.tileUrl,
+                    metadata = cachedMetadata,
+                    tileUrl = buildTileUrl(cityId, cachedMetadata.generationVersion),
                     overrides = cachedOverrides ?: it.overrides,
+                    customAreas = cachedCustomAreas ?: it.customAreas,
+                    error = null
+                )
+            }
+        } else if (cachedOverrides != null && _uiState.value.activeMapCityId == cityId) {
+            _uiState.update {
+                it.copy(
+                    overrides = cachedOverrides,
                     customAreas = cachedCustomAreas ?: it.customAreas,
                     error = null
                 )
@@ -396,33 +415,32 @@ class MapViewModel @Inject constructor(
                 return@launch
             }
 
-            _uiState.update { it.copy(isLoading = true, error = null) }
+            val previousColor = _uiState.value.overrides[baseAreaKey]
+            _uiState.update {
+                it.copy(
+                    error = null,
+                    overrides = it.overrides + (baseAreaKey to color)
+                )
+            }
             val result = mapRepository.updateBaseAreaColor(baseAreaKey, familyId, color, childId)
 
             result.fold(
                 onSuccess = {
-                    _uiState.update { state ->
-                        state.copy(
-                            isLoading = false,
-                            overrides = state.overrides + (baseAreaKey to color)
-                        )
-                    }
-                    launch { loadOverrides(familyId, childId) }
-                    launch { syncAlertZones(_uiState.value.activeMapCityId, familyId, childId) }
+                    refreshMapEditsInBackground(familyId, childId)
                 },
                 onFailure = { error ->
                     if (childId == null) {
                         _uiState.update { state ->
                             state.copy(
-                                isLoading = false,
-                                overrides = state.overrides + (baseAreaKey to color),
                                 error = "Note: Local update only (API Error: ${error.message})"
                             )
                         }
                     } else {
                         _uiState.update { state ->
                             state.copy(
-                                isLoading = false,
+                                overrides = previousColor?.let {
+                                    state.overrides + (baseAreaKey to it)
+                                } ?: state.overrides - baseAreaKey,
                                 error = error.message ?: "Failed to update child zone"
                             )
                         }
@@ -465,16 +483,14 @@ class MapViewModel @Inject constructor(
         if (cityId == _uiState.value.activeMapCityId || cityId == requestedMapCityId) return
         requestedMapCityId = cityId
 
-        viewModelScope.launch {
+        cityLoadJob?.cancel()
+        cityLoadJob = viewModelScope.launch {
             try {
                 _uiState.update {
                     it.copy(
-                        isLoading = true,
                         activePaintColor = null,
                         isCreatingCustomArea = false,
                         draftPoints = emptyList(),
-                        overrides = emptyMap(),
-                        customAreas = emptyList(),
                         error = null
                     )
                 }
@@ -591,29 +607,41 @@ class MapViewModel @Inject constructor(
                     error = null
                 )
             }
-            val result = mapRepository.createCustomArea(
-                familyId = familyId,
-                childId = childId,
+            val optimisticArea = createOptimisticCustomArea(
                 risk = _uiState.value.draftRisk,
                 points = _uiState.value.draftPoints
             )
+            _uiState.update {
+                it.copy(
+                    customAreas = it.customAreas + optimisticArea,
+                    draftPoints = emptyList()
+                )
+            }
+
+            val result = mapRepository.createCustomArea(
+                familyId = familyId,
+                childId = childId,
+                risk = optimisticArea.color,
+                points = optimisticArea.points
+            )
             result.fold(
-                onSuccess = {
+                onSuccess = { createdArea ->
                     _uiState.update {
                         it.copy(
                             isSavingCustomArea = false,
                             isCreatingCustomArea = false,
-                            draftPoints = emptyList(),
+                            customAreas = it.customAreas
+                                .filterNot { area -> area.id == optimisticArea.id } + createdArea,
                             error = null
                         )
                     }
-                    launch { loadOverrides(familyId, childId) }
-                    launch { syncAlertZones(_uiState.value.activeMapCityId, familyId, childId) }
+                    refreshMapEditsInBackground(familyId, childId)
                 },
                 onFailure = { error ->
                     _uiState.update {
                         it.copy(
                             isSavingCustomArea = false,
+                            customAreas = it.customAreas.filterNot { area -> area.id == optimisticArea.id },
                             error = error.message ?: "Failed to create custom zone"
                         )
                     }
@@ -630,6 +658,11 @@ class MapViewModel @Inject constructor(
         val apiRoot = BuildConfig.BASE_URL.trimEnd('/')
         val encodedVersion = URLEncoder.encode(generationVersion, StandardCharsets.UTF_8.toString())
         return "$apiRoot/maps/tiles/$cityId/{z}/{x}/{y}.pbf?v=$encodedVersion"
+    }
+
+    private fun refreshMapEditsInBackground(familyId: String, childId: UserId?) {
+        viewModelScope.launch { loadOverrides(familyId, childId) }
+        viewModelScope.launch { syncAlertZones(_uiState.value.activeMapCityId, familyId, childId) }
     }
 
     private companion object {
@@ -739,4 +772,19 @@ private fun List<ZoneTarget>.refreshChildLabels(children: List<ChildMapLocation>
             target
         }
     }
+}
+
+private fun createOptimisticCustomArea(
+    risk: MapAreaColor,
+    points: List<GeoPoint>
+): MapArea {
+    return MapArea(
+        id = team.kid.roadsafety.domain.AreaId(UUID.randomUUID()),
+        baseAreaKey = null,
+        source = "local",
+        osmId = null,
+        color = risk,
+        points = points,
+        cityId = null
+    )
 }

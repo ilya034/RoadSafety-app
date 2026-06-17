@@ -46,7 +46,12 @@ class MapTileCacheService @Inject constructor(
             .build()
     }
 
-    suspend fun getStyleJsonForCity(cityId: String): String {
+    suspend fun getStyleJsonForCity(cityId: String): String? {
+        // Use OpenFreeMap as the main option by returning null.
+        // This falls back to BaseStyle.Uri(MapBaseStyleUrl) (https://tiles.openfreemap.org/styles/bright) in MapColoringScreen.kt.
+        return null
+
+        /* Original PMTiles implementation:
         val template = withContext(Dispatchers.IO) {
             try {
                 context.assets.open("protomaps_light_template.json").bufferedReader().use { it.readText() }
@@ -65,6 +70,7 @@ class MapTileCacheService @Inject constructor(
         } else {
             getFallbackStyleJson(cityId)
         }
+        */
     }
 
     private fun getFallbackStyleJson(cityId: String): String {

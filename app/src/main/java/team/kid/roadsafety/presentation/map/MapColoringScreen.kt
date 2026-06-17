@@ -180,16 +180,14 @@ fun MapColoringScreen(
         )
     }
 
-    var didCenterInitialCity by remember { mutableStateOf(false) }
     LaunchedEffect(state.activeMapCityId, state.familyCityId, state.metadata?.bbox, state.cities) {
         val bbox = state.metadata?.bbox
-            ?: state.cities.firstOrNull { it.cityId == state.familyCityId }?.bbox
-        if (!didCenterInitialCity && state.activeMapCityId == state.familyCityId && bbox != null) {
+            ?: state.cities.firstOrNull { it.cityId == state.activeMapCityId }?.bbox
+        if (bbox != null) {
             cameraState.position = CameraPosition(
                 target = bbox.centerPosition(),
                 zoom = bbox.defaultZoom()
             )
-            didCenterInitialCity = true
         }
     }
 

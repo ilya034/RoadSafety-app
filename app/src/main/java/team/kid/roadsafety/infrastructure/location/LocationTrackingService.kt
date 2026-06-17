@@ -73,6 +73,12 @@ class LocationTrackingService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (!hasForegroundLocationPermission(this)) {
+            Log.w("LocationTrackingService", "Stopping service: foreground location permission is not granted")
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
                 NOTIFICATION_ID,
@@ -99,6 +105,8 @@ class LocationTrackingService : Service() {
             )
         } catch (unlikely: SecurityException) {
             Log.e("LocationTrackingService", "Lost location permission", unlikely)
+            fusedLocationClient.removeLocationUpdates(locationCallback)
+            stopSelf()
         }
     }
 

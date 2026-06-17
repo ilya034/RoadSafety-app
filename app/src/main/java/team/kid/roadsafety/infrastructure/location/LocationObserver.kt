@@ -13,13 +13,34 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.suspendCancellableCoroutine
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.coroutines.resume
 
 @Singleton
 class LocationObserver @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
+    @SuppressLint("MissingPermission")
+    suspend fun getLastKnownLocation(): Location? = suspendCancellableCoroutine { continuation ->
+        try {
+            LocationServices.getFusedLocationProviderClient(context)
+                .lastLocation
+                .addOnSuccessListener { location ->
+                    if (continuation.isActive) continuation.resume(location)
+                }
+                .addOnFailureListener {
+                    if (continuation.isActive) continuation.resume(null)
+                }
+                .addOnCanceledListener {
+                    if (continuation.isActive) continuation.resume(null)
+                }
+        } catch (e: SecurityException) {
+            continuation.resume(null)
+        }
+    }
+
     @SuppressLint("MissingPermission")
     fun observeLocation(intervalMillis: Long = 15000L): Flow<Location> = callbackFlow {
         val client = LocationServices.getFusedLocationProviderClient(context)

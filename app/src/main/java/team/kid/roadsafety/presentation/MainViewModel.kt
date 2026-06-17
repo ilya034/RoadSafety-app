@@ -97,6 +97,11 @@ class MainViewModel @Inject constructor(
         }
     }
     fun startLocationService(context: android.content.Context) {
+        if (!team.kid.roadsafety.infrastructure.location.hasForegroundLocationPermission(context)) {
+            Log.w("MainViewModel", "Location service start skipped: foreground location permission is not granted")
+            return
+        }
+
         val intent = android.content.Intent(context, team.kid.roadsafety.infrastructure.location.LocationTrackingService::class.java)
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             context.startForegroundService(intent)
