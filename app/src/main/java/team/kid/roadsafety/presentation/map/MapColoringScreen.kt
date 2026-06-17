@@ -85,11 +85,13 @@ import org.maplibre.spatialk.geojson.Position
 import team.kid.roadsafety.domain.aggregates.map.GeoPoint
 import team.kid.roadsafety.domain.aggregates.map.MapArea
 import team.kid.roadsafety.domain.aggregates.map.MapAreaColor
+import team.kid.roadsafety.BuildConfig
 import team.kid.roadsafety.domain.aggregates.map.MapCityBbox
 import org.maplibre.spatialk.geojson.Feature as GeoJsonFeature
 
 @Composable
 fun MapColoringScreen(
+    sessionKey: String = "",
     modifier: Modifier = Modifier,
     viewModel: MapViewModel = hiltViewModel()
 ) {
@@ -101,10 +103,10 @@ fun MapColoringScreen(
         )
     )
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(sessionKey) {
         viewModel.refreshForCurrentUser()
     }
-    DisposableEffect(Unit) {
+    DisposableEffect(sessionKey) {
         onDispose {
             viewModel.stopScreenWork()
         }
@@ -499,7 +501,7 @@ private fun List<GeoPoint>.toClosedPositions(): List<Position> {
     return closed.map { Position(it.longitude, it.latitude) }
 }
 
-private const val MapBaseStyleUrl = "https://tiles.openfreemap.org/styles/bright"
+private val MapBaseStyleUrl = "https://api.maptiler.com/maps/streets-v2/style.json?key=${BuildConfig.MAPTILER_KEY}"
 
 private fun safetyZoneColorExpression(
     overrides: Map<String, MapAreaColor>

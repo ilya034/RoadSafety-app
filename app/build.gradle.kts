@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -5,6 +7,14 @@ plugins {
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
 }
+
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) {
+        file.inputStream().use { load(it) }
+    }
+}
+val maptilerKey = localProperties.getProperty("maptiler.key") ?: "YOUR_MAPTILER_KEY"
 
 android {
     namespace = "team.kid.roadsafety"
@@ -21,6 +31,7 @@ android {
         versionCode = 1
         versionName = "1.0"
 
+        buildConfigField("String", "MAPTILER_KEY", "\"$maptilerKey\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

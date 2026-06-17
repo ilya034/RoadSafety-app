@@ -795,7 +795,7 @@ class MapViewModel @Inject constructor(
 
     private companion object {
         const val DefaultCityId = "ekb"
-        const val BaseMapStyleUrl = "https://tiles.openfreemap.org/styles/bright"
+        val BaseMapStyleUrl = "https://api.maptiler.com/maps/streets-v2/style.json?key=${BuildConfig.MAPTILER_KEY}"
         val DefaultCity = MapCity(
             cityId = DefaultCityId,
             name = "Екатеринбург",

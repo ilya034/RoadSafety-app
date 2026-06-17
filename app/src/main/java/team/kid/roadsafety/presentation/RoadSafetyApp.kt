@@ -16,6 +16,7 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -57,7 +58,13 @@ fun RoadSafetyApp(viewModel: MainViewModel = hiltViewModel()) {
                     )
                 }
 
-                MainScreen(onLogout = { viewModel.logout(context) })
+                val sessionKey = "${state.user.id}:${state.user.familyId}:${state.user.familyRole}"
+                key(sessionKey) {
+                    MainScreen(
+                        sessionKey = sessionKey,
+                        onLogout = { viewModel.logout(context) }
+                    )
+                }
             }
             is AuthState.AuthenticatedButNoFamily -> {
                 FamilyOnboardingScreen(onSuccess = viewModel::onAuthSuccess)
@@ -104,7 +111,10 @@ private fun SafetyWarningBanner(
 }
 
 @Composable
-fun MainScreen(onLogout: () -> Unit) {
+fun MainScreen(
+    sessionKey: String = "",
+    onLogout: () -> Unit
+) {
     var currentDestination by remember { 
         mutableStateOf(AppDestinations.MAP)
     }
@@ -128,7 +138,10 @@ fun MainScreen(onLogout: () -> Unit) {
     ) {
         Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
             when (currentDestination) {
-                AppDestinations.MAP -> MapColoringScreen(modifier = Modifier.padding(innerPadding))
+                AppDestinations.MAP -> MapColoringScreen(
+                    sessionKey = sessionKey,
+                    modifier = Modifier.padding(innerPadding)
+                )
                 AppDestinations.PROFILE -> {
                     ProfileScreen(
                         onLogout = onLogout,
