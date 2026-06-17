@@ -49,11 +49,8 @@ class MapViewModel @Inject constructor(
     private var initializationJob: Job? = null
     private var childrenLocationPollingJob: Job? = null
     private var alertZonesSyncJob: Job? = null
+    private var currentLocationJob: Job? = null
     private var requestedMapCityId: String? = null
-
-    init {
-        observeLocationUpdates()
-    }
 
     fun refreshForCurrentUser() {
         initializationJob?.cancel()
@@ -69,6 +66,8 @@ class MapViewModel @Inject constructor(
         childrenLocationPollingJob = null
         alertZonesSyncJob?.cancel()
         alertZonesSyncJob = null
+        currentLocationJob?.cancel()
+        currentLocationJob = null
     }
 
     private suspend fun initializeMap() {
@@ -80,7 +79,7 @@ class MapViewModel @Inject constructor(
 
         _uiState.update {
             MapUiState(
-                currentLocation = it.currentLocation,
+                currentLocation = if (it.isParent) null else it.currentLocation,
                 isLoading = true
             )
         }
@@ -106,7 +105,10 @@ class MapViewModel @Inject constructor(
             loadZoneTargets(familyId)
         }
         if (isParent) {
+            stopCurrentLocationUpdates()
             startChildrenLocationPolling()
+        } else {
+            startCurrentLocationUpdates()
         }
         loadCity(activeCity.cityId, familyId)
     }
@@ -194,8 +196,10 @@ class MapViewModel @Inject constructor(
         }
     }
 
-    private fun observeLocationUpdates() {
-        viewModelScope.launch {
+    private fun startCurrentLocationUpdates() {
+        if (currentLocationJob?.isActive == true) return
+
+        currentLocationJob = viewModelScope.launch {
             try {
                 locationObserver.observeLocation(5000L).collect { location ->
                     val point = GeoPoint(
@@ -208,6 +212,12 @@ class MapViewModel @Inject constructor(
                 // Permissions might not be granted. Ignore gracefully.
             }
         }
+    }
+
+    private fun stopCurrentLocationUpdates() {
+        currentLocationJob?.cancel()
+        currentLocationJob = null
+        _uiState.update { it.copy(currentLocation = null) }
     }
 
     private fun startChildrenLocationPolling() {

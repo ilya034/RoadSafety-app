@@ -121,8 +121,8 @@ fun MapColoringScreen(
             }
     }
 
-    val currentLocationSource = remember(state.currentLocation) {
-        if (state.currentLocation != null) {
+    val currentLocationSource = remember(state.currentLocation, state.isParent) {
+        if (state.currentLocation != null && !state.isParent) {
             val point = Point(
                 Position(state.currentLocation!!.longitude, state.currentLocation!!.latitude)
             )
