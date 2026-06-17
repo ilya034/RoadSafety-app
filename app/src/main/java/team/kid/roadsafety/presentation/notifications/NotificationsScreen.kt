@@ -163,7 +163,7 @@ private fun NotificationsMessageState(
             text = message,
             modifier = Modifier.padding(top = 8.dp),
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = Color(0xFF1A1C1E)
         )
         Button(
             onClick = onAction,

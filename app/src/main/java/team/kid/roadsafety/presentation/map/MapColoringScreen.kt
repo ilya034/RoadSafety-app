@@ -109,7 +109,7 @@ fun MapColoringScreen(
     )
 
     LaunchedEffect(sessionKey) {
-        viewModel.refreshForCurrentUser()
+        viewModel.refreshForCurrentUser(sessionKey)
     }
     DisposableEffect(sessionKey) {
         onDispose {

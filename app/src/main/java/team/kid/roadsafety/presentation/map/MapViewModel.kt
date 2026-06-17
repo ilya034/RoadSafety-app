@@ -54,7 +54,13 @@ class MapViewModel @Inject constructor(
     private var cityLoadJob: Job? = null
     private var requestedMapCityId: String? = null
 
-    fun refreshForCurrentUser() {
+    private var lastSessionKey: String? = null
+
+    fun refreshForCurrentUser(sessionKey: String = "") {
+        if (sessionKey.isNotEmpty() && lastSessionKey != sessionKey) {
+            lastSessionKey = sessionKey
+            _uiState.update { MapUiState() }
+        }
         initializationJob?.cancel()
         initializationJob = viewModelScope.launch {
             initializeMap()
@@ -91,7 +97,8 @@ class MapViewModel @Inject constructor(
         _uiState.update {
             MapUiState(
                 currentLocation = if (it.isParent) null else it.currentLocation,
-                isLoading = true
+                isLoading = true,
+                lastCameraPosition = it.lastCameraPosition
             )
         }
 
