@@ -57,15 +57,6 @@
    * Выберите модуль `app` в конфигурации запуска.
    * Нажмите кнопку **Run** (зеленый треугольник).
 
-### Примечание по API:
-В текущей версии `BASE_URL` настроен на локальный IP-адрес для отладки в файле `app/build.gradle.kts`:
-```kotlin
-buildTypes {
-    debug {
-        buildConfigField("String", "BASE_URL", "\"http://localhost:5103/api/\"")
-    }
-}
-```
 
 ## Структура проекта
 * `app/src/main/java/team/kid/roadsafety/domain` — доменная логика и сущности.
