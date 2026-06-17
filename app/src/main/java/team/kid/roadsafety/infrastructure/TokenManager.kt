@@ -2,13 +2,16 @@ package team.kid.roadsafety.infrastructure
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.serialization.json.Json
+import team.kid.roadsafety.data.dto.UserResponseDto
 import team.kid.roadsafety.domain.aggregates.session.AuthTokens
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class TokenManager @Inject constructor(
-    @ApplicationContext context: Context
+    @ApplicationContext context: Context,
+    private val json: Json
 ) {
     private val prefs = context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
 
@@ -29,7 +32,42 @@ class TokenManager @Inject constructor(
         }
     }
 
+    fun saveUser(user: UserResponseDto) {
+        try {
+            val userJson = json.encodeToString(UserResponseDto.serializer(), user)
+            prefs.edit().putString("cached_user", userJson).apply()
+        } catch (e: Exception) {
+            // Ignore serialization error
+        }
+    }
+
+    fun getUser(): UserResponseDto? {
+        val userJson = prefs.getString("cached_user", null) ?: return null
+        return try {
+            json.decodeFromString(UserResponseDto.serializer(), userJson)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     fun clearTokens() {
-        prefs.edit().clear().apply()
+        prefs.edit()
+            .remove("access_token")
+            .remove("refresh_token")
+            .remove("cached_user")
+            .apply()
+    }
+
+    fun saveFcmToken(token: String) {
+        prefs.edit().putString("fcm_token", token).apply()
+    }
+
+    fun getFcmToken(): String? {
+        return prefs.getString("fcm_token", null)
+    }
+
+    fun hasAuthTokens(): Boolean {
+        return getTokens() != null
     }
 }
+

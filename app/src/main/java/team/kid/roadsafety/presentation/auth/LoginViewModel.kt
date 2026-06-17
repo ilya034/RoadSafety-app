@@ -35,9 +35,9 @@ class LoginViewModel @Inject constructor(
             val result = authRepository.login(_uiState.value.login, _uiState.value.password)
             result.fold(
                 onSuccess = { response ->
-                    Log.d("LoginViewModel", "Login successful, user data in response: ${response.user}")
+                    Log.d("LoginViewModel", "Login successful")
                     _uiState.update { it.copy(isLoading = false) }
-                    onSuccess(response.user)
+                    onSuccess(null)
                 },
                 onFailure = { error ->
                     Log.e("LoginViewModel", "Login failed", error)
