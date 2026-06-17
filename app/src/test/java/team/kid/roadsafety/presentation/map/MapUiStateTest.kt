@@ -1,0 +1,106 @@
+package team.kid.roadsafety.presentation.map
+
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import team.kid.roadsafety.domain.aggregates.map.GeoPoint
+
+class MapUiStateTest {
+    @Test
+    fun customPolygonSaveRequiresThreeUniquePointsAndEditableMap() {
+        val editableState = MapUiState(
+            activeMapCityId = "ekb",
+            familyCityId = "ekb",
+            familyId = "family",
+            isParent = true
+        )
+
+        assertFalse(editableState.copy(draftPoints = emptyList()).canSaveCustomArea)
+        assertFalse(
+            editableState.copy(
+                draftPoints = listOf(
+                    GeoPoint(56.0, 60.0),
+                    GeoPoint(57.0, 61.0),
+                    GeoPoint(56.0, 60.0)
+                )
+            ).canSaveCustomArea
+        )
+        assertTrue(
+            editableState.copy(
+                draftPoints = listOf(
+                    GeoPoint(56.0, 60.0),
+                    GeoPoint(57.0, 61.0),
+                    GeoPoint(58.0, 62.0)
+                )
+            ).canSaveCustomArea
+        )
+        assertFalse(
+            editableState.copy(
+                activeMapCityId = "other",
+                draftPoints = listOf(
+                    GeoPoint(56.0, 60.0),
+                    GeoPoint(57.0, 61.0),
+                    GeoPoint(58.0, 62.0)
+                )
+            ).canSaveCustomArea
+        )
+        assertFalse(
+            editableState.copy(
+                isOnline = false,
+                draftPoints = listOf(
+                    GeoPoint(56.0, 60.0),
+                    GeoPoint(57.0, 61.0),
+                    GeoPoint(58.0, 62.0)
+                )
+            ).canSaveCustomArea
+        )
+    }
+
+    @Test
+    fun visibleChildrenFollowSelectedZoneTarget() {
+        val firstChild = ChildMapLocation(
+            childId = "child-1",
+            displayName = "First",
+            point = GeoPoint(56.0, 60.0),
+            currentRisk = "Green",
+            lastUpdatedAt = "now"
+        )
+        val secondChild = ChildMapLocation(
+            childId = "child-2",
+            displayName = "Second",
+            point = GeoPoint(57.0, 61.0),
+            currentRisk = "Red",
+            lastUpdatedAt = "now"
+        )
+        val state = MapUiState(
+            childLocations = listOf(firstChild, secondChild)
+        )
+
+        assertEquals(listOf(firstChild, secondChild), state.visibleChildLocations)
+        assertEquals(
+            listOf(secondChild),
+            state.copy(selectedZoneTarget = ZoneTarget.Child("child-2", "Second")).visibleChildLocations
+        )
+    }
+
+    @Test
+    fun visibleChildrenUseLatestLocationPerChild() {
+        val oldLocation = ChildMapLocation(
+            childId = "child-1",
+            displayName = "First",
+            point = GeoPoint(56.0, 60.0),
+            currentRisk = "Green",
+            lastUpdatedAt = "2026-06-17T10:00:00Z"
+        )
+        val newLocation = oldLocation.copy(
+            point = GeoPoint(57.0, 61.0),
+            lastUpdatedAt = "2026-06-17T10:01:00Z"
+        )
+        val state = MapUiState(
+            childLocations = listOf(oldLocation, newLocation)
+        )
+
+        assertEquals(listOf(newLocation), state.visibleChildLocations)
+    }
+}

@@ -217,15 +217,17 @@ class MapViewModel @Inject constructor(
                 trackingRepository.getChildrenLocations()
                     .fold(
                         onSuccess = { response ->
-                            val childLocations = response.children.map { child ->
-                                ChildMapLocation(
-                                    childId = child.childId,
-                                    displayName = child.displayName,
-                                    point = GeoPoint(child.latitude, child.longitude),
-                                    currentRisk = child.currentRisk.name,
-                                    lastUpdatedAt = child.lastUpdatedAt
-                                )
-                            }
+                            val childLocations = response.children
+                                .map { child ->
+                                    ChildMapLocation(
+                                        childId = child.childId,
+                                        displayName = child.displayName,
+                                        point = GeoPoint(child.latitude, child.longitude),
+                                        currentRisk = child.currentRisk.name,
+                                        lastUpdatedAt = child.lastUpdatedAt
+                                    )
+                                }
+                                .latestByChildId()
                             _uiState.update {
                                 val refreshedTargets = it.zoneTargets.refreshChildLabels(childLocations)
                                 it.copy(
@@ -389,14 +391,14 @@ class MapViewModel @Inject constructor(
 
             result.fold(
                 onSuccess = {
-                    loadOverrides(familyId)
-                    syncAlertZones(_uiState.value.activeMapCityId, familyId)
                     _uiState.update { state ->
                         state.copy(
                             isLoading = false,
                             overrides = state.overrides + (baseAreaKey to color)
                         )
                     }
+                    launch { loadOverrides(familyId, childId) }
+                    launch { syncAlertZones(_uiState.value.activeMapCityId, familyId, childId) }
                 },
                 onFailure = { error ->
                     if (childId == null) {
@@ -570,17 +572,23 @@ class MapViewModel @Inject constructor(
                 return@launch
             }
 
-            _uiState.update { it.copy(isOnline = true, isSavingCustomArea = true, error = null) }
+            val childId = _uiState.value.selectedZoneTarget.childUserId()
+            _uiState.update {
+                it.copy(
+                    isOnline = true,
+                    isSavingCustomArea = true,
+                    isCreatingCustomArea = false,
+                    error = null
+                )
+            }
             val result = mapRepository.createCustomArea(
                 familyId = familyId,
-                childId = _uiState.value.selectedZoneTarget.childUserId(),
+                childId = childId,
                 risk = _uiState.value.draftRisk,
                 points = _uiState.value.draftPoints
             )
             result.fold(
                 onSuccess = {
-                    loadOverrides(familyId)
-                    syncAlertZones(_uiState.value.activeMapCityId, familyId)
                     _uiState.update {
                         it.copy(
                             isSavingCustomArea = false,
@@ -589,6 +597,8 @@ class MapViewModel @Inject constructor(
                             error = null
                         )
                     }
+                    launch { loadOverrides(familyId, childId) }
+                    launch { syncAlertZones(_uiState.value.activeMapCityId, familyId, childId) }
                 },
                 onFailure = { error ->
                     _uiState.update {
@@ -654,8 +664,8 @@ data class MapUiState(
 ) {
     val visibleChildLocations: List<ChildMapLocation>
         get() = when (val target = selectedZoneTarget) {
-            ZoneTarget.AllFamily -> childLocations
-            is ZoneTarget.Child -> childLocations.filter { child -> child.childId == target.childId }
+            ZoneTarget.AllFamily -> childLocations.latestByChildId()
+            is ZoneTarget.Child -> childLocations.filter { child -> child.childId == target.childId }.latestByChildId()
         }
 
     val canEditMap: Boolean
@@ -678,6 +688,12 @@ data class ChildMapLocation(
 ) {
     val label: String
         get() = displayName.ifBlank { "Child ${childId.take(8)}" }
+}
+
+private fun List<ChildMapLocation>.latestByChildId(): List<ChildMapLocation> {
+    return groupBy { it.childId }
+        .values
+        .map { locations -> locations.maxBy { it.lastUpdatedAt } }
 }
 
 sealed class ZoneTarget(
