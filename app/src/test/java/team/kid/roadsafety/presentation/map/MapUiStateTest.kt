@@ -179,4 +179,33 @@ class MapUiStateTest {
         assertNull(draftState.activePaintColor)
         assertFalse(draftState.isEraseMode)
     }
+
+    @Test
+    fun currentRequestChildIdResolvesCorrectlyDependingOnRole() {
+        val childUuid = java.util.UUID.randomUUID()
+        val childId = team.kid.roadsafety.domain.UserId(childUuid)
+
+        // For a parent, it should return selectedZoneTarget.childUserId()
+        val parentStateAll = MapUiState(
+            isParent = true,
+            selectedZoneTarget = ZoneTarget.AllFamily,
+            currentChildId = childId
+        )
+        assertNull(parentStateAll.currentRequestChildId)
+
+        val parentStateSpecific = MapUiState(
+            isParent = true,
+            selectedZoneTarget = ZoneTarget.Child(childUuid.toString(), "Child label"),
+            currentChildId = childId
+        )
+        assertEquals(childId, parentStateSpecific.currentRequestChildId)
+
+        // For a child, it should always return currentChildId
+        val childStateAll = MapUiState(
+            isParent = false,
+            selectedZoneTarget = ZoneTarget.AllFamily,
+            currentChildId = childId
+        )
+        assertEquals(childId, childStateAll.currentRequestChildId)
+    }
 }

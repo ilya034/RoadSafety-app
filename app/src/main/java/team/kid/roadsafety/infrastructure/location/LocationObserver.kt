@@ -42,6 +42,29 @@ class LocationObserver @Inject constructor(
     }
 
     @SuppressLint("MissingPermission")
+    suspend fun getCurrentLocation(): Location? = suspendCancellableCoroutine { continuation ->
+        try {
+            val client = LocationServices.getFusedLocationProviderClient(context)
+            val cts = com.google.android.gms.tasks.CancellationTokenSource()
+            client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
+                .addOnSuccessListener { location ->
+                    if (continuation.isActive) continuation.resume(location)
+                }
+                .addOnFailureListener {
+                    if (continuation.isActive) continuation.resume(null)
+                }
+                .addOnCanceledListener {
+                    if (continuation.isActive) continuation.resume(null)
+                }
+            continuation.invokeOnCancellation {
+                cts.cancel()
+            }
+        } catch (e: SecurityException) {
+            continuation.resume(null)
+        }
+    }
+
+    @SuppressLint("MissingPermission")
     fun observeLocation(intervalMillis: Long = 15000L): Flow<Location> = callbackFlow {
         val client = LocationServices.getFusedLocationProviderClient(context)
         

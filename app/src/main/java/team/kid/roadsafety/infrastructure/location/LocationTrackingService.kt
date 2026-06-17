@@ -46,29 +46,53 @@ class LocationTrackingService : Service() {
         locationCallback = object : LocationCallback() {
             override fun onLocationResult(locationResult: LocationResult) {
                 locationResult.lastLocation?.let { location ->
-                    serviceScope.launch {
-                        try {
-                            val result = trackingRepository.submitChildLocation(
-                                latitude = location.latitude,
-                                longitude = location.longitude,
-                                accuracyMeters = if (location.hasAccuracy()) location.accuracy.toDouble() else null
-                            )
-                            if (result.isFailure) {
-                                Log.e("LocationTrackingService", "Failed to submit location API side", result.exceptionOrNull())
-                                val localRisk = localRiskEvaluator.evaluate(location.latitude, location.longitude)
-                                warningAlertManager.handleRisk(localRisk, offline = true)
-                            } else {
-                                val serverRisk = MapAreaColor.fromString(result.getOrThrow().currentRisk.name)
-                                warningAlertManager.handleRisk(serverRisk, offline = false)
-                            }
-                        } catch (e: Exception) {
-                            Log.e("LocationTrackingService", "Failed to submit location", e)
-                            val localRisk = localRiskEvaluator.evaluate(location.latitude, location.longitude)
-                            warningAlertManager.handleRisk(localRisk, offline = true)
-                        }
-                    }
+                    submitLocation(location)
                 }
             }
+        }
+    }
+
+    private fun submitLocation(location: android.location.Location) {
+        serviceScope.launch {
+            try {
+                val result = trackingRepository.submitChildLocation(
+                    latitude = location.latitude,
+                    longitude = location.longitude,
+                    accuracyMeters = if (location.hasAccuracy()) location.accuracy.toDouble() else null
+                )
+                if (result.isFailure) {
+                    Log.e("LocationTrackingService", "Failed to submit location API side", result.exceptionOrNull())
+                    val localRisk = localRiskEvaluator.evaluate(location.latitude, location.longitude)
+                    warningAlertManager.handleRisk(localRisk, offline = true)
+                } else {
+                    val serverRisk = MapAreaColor.fromString(result.getOrThrow().currentRisk.name)
+                    warningAlertManager.handleRisk(serverRisk, offline = false)
+                }
+            } catch (e: Exception) {
+                Log.e("LocationTrackingService", "Failed to submit location", e)
+                val localRisk = localRiskEvaluator.evaluate(location.latitude, location.longitude)
+                warningAlertManager.handleRisk(localRisk, offline = true)
+            }
+        }
+    }
+
+    private fun sendInitialLocation() {
+        try {
+            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                if (location != null) {
+                    submitLocation(location)
+                } else {
+                    val cts = com.google.android.gms.tasks.CancellationTokenSource()
+                    fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
+                        .addOnSuccessListener { freshLocation ->
+                            if (freshLocation != null) {
+                                submitLocation(freshLocation)
+                            }
+                        }
+                }
+            }
+        } catch (e: SecurityException) {
+            Log.e("LocationTrackingService", "No permission for initial location", e)
         }
     }
 
@@ -88,6 +112,7 @@ class LocationTrackingService : Service() {
         } else {
             startForeground(NOTIFICATION_ID, createNotification())
         }
+        sendInitialLocation()
         requestLocationUpdates()
         return START_STICKY
     }
