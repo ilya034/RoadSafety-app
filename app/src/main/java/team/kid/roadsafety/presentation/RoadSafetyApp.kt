@@ -22,17 +22,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import team.kid.roadsafety.R
+import team.kid.roadsafety.infrastructure.location.LocationPermissionHelper
+import team.kid.roadsafety.infrastructure.location.WarningAlertEvents
 import team.kid.roadsafety.presentation.auth.AuthNavigation
 import team.kid.roadsafety.presentation.family.FamilyOnboardingScreen
 import team.kid.roadsafety.presentation.map.MapColoringScreen
 import team.kid.roadsafety.presentation.profile.ProfileScreen
-import team.kid.roadsafety.infrastructure.location.LocationPermissionHelper
-import team.kid.roadsafety.infrastructure.location.WarningAlertEvents
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 
 @Composable
 fun RoadSafetyApp(viewModel: MainViewModel = hiltViewModel()) {

@@ -3,18 +3,15 @@ package team.kid.roadsafety.presentation.map
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
-import java.util.UUID
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import team.kid.roadsafety.BuildConfig
 import team.kid.roadsafety.domain.FamilyId
 import team.kid.roadsafety.domain.UserId
-import team.kid.roadsafety.BuildConfig
 import team.kid.roadsafety.domain.aggregates.family.FamilyMemberEntity
 import team.kid.roadsafety.domain.aggregates.family.FamilyRepository
 import team.kid.roadsafety.domain.aggregates.map.GeoPoint
@@ -30,6 +27,9 @@ import team.kid.roadsafety.domain.aggregates.user.UserRole
 import team.kid.roadsafety.infrastructure.NetworkMonitor
 import team.kid.roadsafety.infrastructure.location.LocationObserver
 import team.kid.roadsafety.infrastructure.map.MapTileCacheService
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
+import java.util.UUID
 import javax.inject.Inject
 
 @HiltViewModel

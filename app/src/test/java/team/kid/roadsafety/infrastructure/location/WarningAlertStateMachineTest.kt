@@ -1,13 +1,13 @@
 package team.kid.roadsafety.infrastructure.location
 
-import java.time.Instant
-import kotlin.time.Duration.Companion.minutes
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
 import team.kid.roadsafety.domain.aggregates.map.MapAreaColor
 import team.kid.roadsafety.domain.aggregates.tracking.WarningAlertType
+import java.time.Instant
+import kotlin.time.Duration.Companion.minutes
 
 class WarningAlertStateMachineTest {
     @Test

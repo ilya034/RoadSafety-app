@@ -9,9 +9,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import team.kid.roadsafety.data.dto.UserResponseDto
-import team.kid.roadsafety.domain.aggregates.user.AuthRepository
 import team.kid.roadsafety.domain.aggregates.family.FamilyRepository
-import team.kid.roadsafety.domain.aggregates.family.FamilyRole
+import team.kid.roadsafety.domain.aggregates.user.AuthRepository
 import team.kid.roadsafety.domain.aggregates.user.UserRole
 import java.time.LocalDate
 import javax.inject.Inject

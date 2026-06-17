@@ -3,7 +3,6 @@ package team.kid.roadsafety.data.local
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromStream
 import team.kid.roadsafety.data.dto.AlertZonesResponseDto

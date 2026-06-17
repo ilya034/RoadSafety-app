@@ -2,7 +2,6 @@ package team.kid.roadsafety.data.local
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import team.kid.roadsafety.data.dto.SubmitLocationRequestDto
 import java.time.Duration

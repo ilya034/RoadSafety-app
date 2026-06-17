@@ -10,13 +10,13 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.time.Clock
-import kotlin.time.Duration.Companion.minutes
 import team.kid.roadsafety.R
 import team.kid.roadsafety.domain.aggregates.map.MapAreaColor
 import team.kid.roadsafety.domain.aggregates.tracking.WarningAlert
+import java.time.Clock
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.time.Duration.Companion.minutes
 
 @Singleton
 class WarningAlertManager @Inject constructor(

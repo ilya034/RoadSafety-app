@@ -1,7 +1,7 @@
 package team.kid.roadsafety.domain.aggregates.map
 
-import team.kid.roadsafety.domain.UserId
 import team.kid.roadsafety.domain.AreaId
+import team.kid.roadsafety.domain.UserId
 
 interface MapRepository {
     suspend fun getUserAreas(familyId: String, childId: UserId? = null): Result<List<MapArea>>

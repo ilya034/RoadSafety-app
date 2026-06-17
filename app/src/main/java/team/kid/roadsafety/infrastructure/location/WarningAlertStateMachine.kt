@@ -1,10 +1,10 @@
 package team.kid.roadsafety.infrastructure.location
 
-import java.time.Instant
-import kotlin.time.Duration
 import team.kid.roadsafety.domain.aggregates.map.MapAreaColor
 import team.kid.roadsafety.domain.aggregates.tracking.WarningAlert
 import team.kid.roadsafety.domain.aggregates.tracking.WarningAlertType
+import java.time.Instant
+import kotlin.time.Duration
 
 class WarningAlertStateMachine(
     private val cooldown: Duration

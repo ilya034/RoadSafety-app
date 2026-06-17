@@ -10,8 +10,8 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
-import team.kid.roadsafety.data.remote.RoadSafetyApi
 import team.kid.roadsafety.BuildConfig
+import team.kid.roadsafety.data.remote.RoadSafetyApi
 import team.kid.roadsafety.infrastructure.AuthInterceptor
 import team.kid.roadsafety.infrastructure.TokenAuthenticator
 import javax.inject.Singleton

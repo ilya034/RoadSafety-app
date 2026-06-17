@@ -1,9 +1,11 @@
 package team.kid.roadsafety.data.repository
 
-import team.kid.roadsafety.data.remote.RoadSafetyApi
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import team.kid.roadsafety.data.local.MapCacheLocalDataSource
+import team.kid.roadsafety.data.remote.RoadSafetyApi
 import team.kid.roadsafety.domain.AreaId
-import team.kid.roadsafety.domain.CityId
 import team.kid.roadsafety.domain.UserId
 import team.kid.roadsafety.domain.aggregates.map.AlertZone
 import team.kid.roadsafety.domain.aggregates.map.GeoPoint
@@ -15,9 +17,6 @@ import team.kid.roadsafety.domain.aggregates.map.MapRepository
 import team.kid.roadsafety.infrastructure.parseErrorMessage
 import java.util.UUID
 import javax.inject.Inject
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.CancellationException
 
 class MapRepositoryImpl @Inject constructor(
     private val api: RoadSafetyApi,

@@ -2,8 +2,40 @@ package team.kid.roadsafety.data.remote
 
 import okhttp3.ResponseBody
 import retrofit2.Response
-import retrofit2.http.*
-import team.kid.roadsafety.data.dto.*
+import retrofit2.http.Body
+import retrofit2.http.DELETE
+import retrofit2.http.GET
+import retrofit2.http.POST
+import retrofit2.http.PUT
+import retrofit2.http.Path
+import retrofit2.http.Query
+import team.kid.roadsafety.data.dto.AuthResponseDto
+import team.kid.roadsafety.data.dto.ChildLocationResponseDto
+import team.kid.roadsafety.data.dto.ChildLocationsResponseDto
+import team.kid.roadsafety.data.dto.ChildStatsResponseDto
+import team.kid.roadsafety.data.dto.CreateBaseAreaOverrideRequestDto
+import team.kid.roadsafety.data.dto.CreateCustomUserMapAreaRequestDto
+import team.kid.roadsafety.data.dto.CreateFamilyRequestDto
+import team.kid.roadsafety.data.dto.CreateFamilyResponseDto
+import team.kid.roadsafety.data.dto.CreateInviteCodeRequestDto
+import team.kid.roadsafety.data.dto.GetFamilyMembersResponseDto
+import team.kid.roadsafety.data.dto.InviteCodeResponseDto
+import team.kid.roadsafety.data.dto.JoinFamilyByInviteCodeRequestDto
+import team.kid.roadsafety.data.dto.JoinFamilyByInviteCodeResponseDto
+import team.kid.roadsafety.data.dto.LogOutRequestDto
+import team.kid.roadsafety.data.dto.LoginRequestDto
+import team.kid.roadsafety.data.dto.MapCitiesResponseDto
+import team.kid.roadsafety.data.dto.MapCityMetadataDto
+import team.kid.roadsafety.data.dto.NotificationsResponseDto
+import team.kid.roadsafety.data.dto.RefreshTokensRequestDto
+import team.kid.roadsafety.data.dto.RefreshTokensResponseDto
+import team.kid.roadsafety.data.dto.RegisterRequestDto
+import team.kid.roadsafety.data.dto.SubmitLocationRequestDto
+import team.kid.roadsafety.data.dto.SubmitLocationResponseDto
+import team.kid.roadsafety.data.dto.UpdateFamilyCityRequestDto
+import team.kid.roadsafety.data.dto.UserMapAreaFeatureCollectionDto
+import team.kid.roadsafety.data.dto.UserMapAreaFeatureDto
+import team.kid.roadsafety.data.dto.UserResponseDto
 
 interface RoadSafetyApi {
     @POST("auth/register")
