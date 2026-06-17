@@ -1,19 +1,19 @@
-openapi: 3.1.0
+﻿openapi: 3.1.0
 info:
   title: RoadSafety API
   version: "1.0.0"
   description: |
-    REST API для приложения RoadSafety.
-    Один клиент используется и для родителей, и для детей, а роль пользователя хранится на сервере
-    и задаётся при подключении к семье.
+    REST API РґР»СЏ РїСЂРёР»РѕР¶РµРЅРёСЏ RoadSafety.
+    РћРґРёРЅ РєР»РёРµРЅС‚ РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ Рё РґР»СЏ СЂРѕРґРёС‚РµР»РµР№, Рё РґР»СЏ РґРµС‚РµР№, Р° СЂРѕР»СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ С…СЂР°РЅРёС‚СЃСЏ РЅР° СЃРµСЂРІРµСЂРµ
+    Рё Р·Р°РґР°С‘С‚СЃСЏ РїСЂРё РїРѕРґРєР»СЋС‡РµРЅРёРё Рє СЃРµРјСЊРµ.
 
-    Основной поток:
-    1. Родитель регистрируется (без роли).
-    2. Родитель присоединяется к семье или создаёт новую семью (становится parent).
-    3. Родитель генерирует одноразовый код для ребёнка.
-    4. Ребёнок регистрируется (без роли).
-    5. Ребёнок вводит код.
-    6. Сервер устанавливает ребёнку роль child и создаёт запись FamilyMember.
+    РћСЃРЅРѕРІРЅРѕР№ РїРѕС‚РѕРє:
+    1. Р РѕРґРёС‚РµР»СЊ СЂРµРіРёСЃС‚СЂРёСЂСѓРµС‚СЃСЏ (Р±РµР· СЂРѕР»Рё).
+    2. Р РѕРґРёС‚РµР»СЊ РїСЂРёСЃРѕРµРґРёРЅСЏРµС‚СЃСЏ Рє СЃРµРјСЊРµ РёР»Рё СЃРѕР·РґР°С‘С‚ РЅРѕРІСѓСЋ СЃРµРјСЊСЋ (СЃС‚Р°РЅРѕРІРёС‚СЃСЏ parent).
+    3. Р РѕРґРёС‚РµР»СЊ РіРµРЅРµСЂРёСЂСѓРµС‚ РѕРґРЅРѕСЂР°Р·РѕРІС‹Р№ РєРѕРґ РґР»СЏ СЂРµР±С‘РЅРєР°.
+    4. Р РµР±С‘РЅРѕРє СЂРµРіРёСЃС‚СЂРёСЂСѓРµС‚СЃСЏ (Р±РµР· СЂРѕР»Рё).
+    5. Р РµР±С‘РЅРѕРє РІРІРѕРґРёС‚ РєРѕРґ.
+    6. РЎРµСЂРІРµСЂ СѓСЃС‚Р°РЅР°РІР»РёРІР°РµС‚ СЂРµР±С‘РЅРєСѓ СЂРѕР»СЊ child Рё СЃРѕР·РґР°С‘С‚ Р·Р°РїРёСЃСЊ FamilyMember.
 
 servers:
   - url: http://localhost:5103/api
@@ -36,8 +36,8 @@ paths:
         - Auth
       summary: Register a new user
       description: |
-        Создаёт аккаунт с email или номером телефона и сразу возвращает access/refresh токены.
-        Роль пользователя будет установлена при подключении к семье.
+        РЎРѕР·РґР°С‘С‚ Р°РєРєР°СѓРЅС‚ СЃ email РёР»Рё РЅРѕРјРµСЂРѕРј С‚РµР»РµС„РѕРЅР° Рё СЃСЂР°Р·Сѓ РІРѕР·РІСЂР°С‰Р°РµС‚ access/refresh С‚РѕРєРµРЅС‹.
+        Р РѕР»СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ Р±СѓРґРµС‚ СѓСЃС‚Р°РЅРѕРІР»РµРЅР° РїСЂРё РїРѕРґРєР»СЋС‡РµРЅРёРё Рє СЃРµРјСЊРµ.
       operationId: registerUser
       security: []
       requestBody:
@@ -71,7 +71,7 @@ paths:
       tags:
         - Auth
       summary: Login
-      description: Авторизация по email или телефону и паролю.
+      description: РђРІС‚РѕСЂРёР·Р°С†РёСЏ РїРѕ email РёР»Рё С‚РµР»РµС„РѕРЅСѓ Рё РїР°СЂРѕР»СЋ.
       operationId: loginUser
       security: []
       requestBody:
@@ -138,7 +138,7 @@ paths:
       tags:
         - Auth
       summary: Logout
-      description: Инвалидирует refresh token текущей сессии.
+      description: РРЅРІР°Р»РёРґРёСЂСѓРµС‚ refresh token С‚РµРєСѓС‰РµР№ СЃРµСЃСЃРёРё.
       operationId: logoutUser
       security: []
       requestBody:
@@ -168,7 +168,7 @@ paths:
       tags:
         - Users
       summary: Get user by email or phone
-      description: Поиск пользователя по email или номеру телефона. Требует авторизации.
+      description: РџРѕРёСЃРє РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РїРѕ email РёР»Рё РЅРѕРјРµСЂСѓ С‚РµР»РµС„РѕРЅР°. РўСЂРµР±СѓРµС‚ Р°РІС‚РѕСЂРёР·Р°С†РёРё.
       operationId: getUserByContact
       parameters:
         - name: email
@@ -177,13 +177,13 @@ paths:
           schema:
             type: string
             format: email
-          description: Email пользователя.
+          description: Email РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ.
         - name: phone
           in: query
           required: false
           schema:
             type: string
-          description: Номер телефона в E.164 формате (например +79991234567).
+          description: РќРѕРјРµСЂ С‚РµР»РµС„РѕРЅР° РІ E.164 С„РѕСЂРјР°С‚Рµ (РЅР°РїСЂРёРјРµСЂ +79991234567).
       responses:
         "200":
           description: User found
@@ -215,7 +215,7 @@ paths:
       tags:
         - Users
       summary: Get current user info
-      description: Получить информацию о текущем пользователе по ID из JWT токена, включая ID семьи.
+      description: РџРѕР»СѓС‡РёС‚СЊ РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ С‚РµРєСѓС‰РµРј РїРѕР»СЊР·РѕРІР°С‚РµР»Рµ РїРѕ ID РёР· JWT С‚РѕРєРµРЅР°, РІРєР»СЋС‡Р°СЏ ID СЃРµРјСЊРё.
       operationId: getCurrentUser
       responses:
         "200":
@@ -243,8 +243,8 @@ paths:
         - Families
       summary: Create family
       description: |
-        При создании семьи пользователю устанавливается роль `parent`.
-        Сервер автоматически создаёт запись FamilyMember для текущего пользователя.
+        РџСЂРё СЃРѕР·РґР°РЅРёРё СЃРµРјСЊРё РїРѕР»СЊР·РѕРІР°С‚РµР»СЋ СѓСЃС‚Р°РЅР°РІР»РёРІР°РµС‚СЃСЏ СЂРѕР»СЊ `parent`.
+        РЎРµСЂРІРµСЂ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё СЃРѕР·РґР°С‘С‚ Р·Р°РїРёСЃСЊ FamilyMember РґР»СЏ С‚РµРєСѓС‰РµРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ.
       operationId: createFamily
       requestBody:
         required: true
@@ -278,9 +278,9 @@ paths:
         - Families
       summary: Update family city
       description: |
-        Обновляет город для семьи. Только для пользователей с ролью parent.
-        Внимание: при изменении города все существующие пользовательские переопределения (overrides)
-        и кастомные зоны (custom areas) данной семьи будут безвозвратно удалены.
+        РћР±РЅРѕРІР»СЏРµС‚ РіРѕСЂРѕРґ РґР»СЏ СЃРµРјСЊРё. РўРѕР»СЊРєРѕ РґР»СЏ РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ СЃ СЂРѕР»СЊСЋ parent.
+        Р’РЅРёРјР°РЅРёРµ: РїСЂРё РёР·РјРµРЅРµРЅРёРё РіРѕСЂРѕРґР° РІСЃРµ СЃСѓС‰РµСЃС‚РІСѓСЋС‰РёРµ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊСЃРєРёРµ РїРµСЂРµРѕРїСЂРµРґРµР»РµРЅРёСЏ (overrides)
+        Рё РєР°СЃС‚РѕРјРЅС‹Рµ Р·РѕРЅС‹ (custom areas) РґР°РЅРЅРѕР№ СЃРµРјСЊРё Р±СѓРґСѓС‚ Р±РµР·РІРѕР·РІСЂР°С‚РЅРѕ СѓРґР°Р»РµРЅС‹.
       operationId: updateFamilyCity
       parameters:
         - name: familyId
@@ -300,7 +300,7 @@ paths:
               properties:
                 cityId:
                   type: string
-                  description: Идентификатор нового города (например, "ekb").
+                  description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ РЅРѕРІРѕРіРѕ РіРѕСЂРѕРґР° (РЅР°РїСЂРёРјРµСЂ, "ekb").
       responses:
         "204":
           description: City updated successfully, obsolete overrides purged.
@@ -334,7 +334,7 @@ paths:
       tags:
         - Families
       summary: List family members
-      description: Возвращает id и роль участников семьи.
+      description: Р’РѕР·РІСЂР°С‰Р°РµС‚ id Рё СЂРѕР»СЊ СѓС‡Р°СЃС‚РЅРёРєРѕРІ СЃРµРјСЊРё.
       operationId: listFamilyMembers
       parameters:
         - name: familyId
@@ -370,8 +370,8 @@ paths:
         - Families
       summary: Generate family invite code
       description: |
-        Только для родителя, состоящего в семье.
-        Генерирует одноразовый код для приглашения других пользователей в семью с указанной ролью.
+        РўРѕР»СЊРєРѕ РґР»СЏ СЂРѕРґРёС‚РµР»СЏ, СЃРѕСЃС‚РѕСЏС‰РµРіРѕ РІ СЃРµРјСЊРµ.
+        Р“РµРЅРµСЂРёСЂСѓРµС‚ РѕРґРЅРѕСЂР°Р·РѕРІС‹Р№ РєРѕРґ РґР»СЏ РїСЂРёРіР»Р°С€РµРЅРёСЏ РґСЂСѓРіРёС… РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ РІ СЃРµРјСЊСЋ СЃ СѓРєР°Р·Р°РЅРЅРѕР№ СЂРѕР»СЊСЋ.
       operationId: createInviteCode
       requestBody:
         required: true
@@ -411,8 +411,8 @@ paths:
         - Families
       summary: Join family using invite code
       description: |
-        По валидному одноразовому коду сервер создаёт запись FamilyMember и добавляет пользователя в семью.
-        Если userRole не совпадает с ролью, для которой создан inviteCode, добавление не происходит.
+        РџРѕ РІР°Р»РёРґРЅРѕРјСѓ РѕРґРЅРѕСЂР°Р·РѕРІРѕРјСѓ РєРѕРґСѓ СЃРµСЂРІРµСЂ СЃРѕР·РґР°С‘С‚ Р·Р°РїРёСЃСЊ FamilyMember Рё РґРѕР±Р°РІР»СЏРµС‚ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РІ СЃРµРјСЊСЋ.
+        Р•СЃР»Рё userRole РЅРµ СЃРѕРІРїР°РґР°РµС‚ СЃ СЂРѕР»СЊСЋ, РґР»СЏ РєРѕС‚РѕСЂРѕР№ СЃРѕР·РґР°РЅ inviteCode, РґРѕР±Р°РІР»РµРЅРёРµ РЅРµ РїСЂРѕРёСЃС…РѕРґРёС‚.
       operationId: joinFamilyByInviteCode
       requestBody:
         required: true
@@ -452,9 +452,9 @@ paths:
         - Maps
       summary: Get vector tile of safety zones (MVT) for a city
       description: |
-        Возвращает бинарный векторный тайл Mapbox Vector Tile (.pbf), содержащий зоны безопасности для указанного города.
-        Доступно только для масштабов (zoom) от 12 до 18.
-        Данный URL зависит только от города и версии, что позволяет кэшировать тайлы на уровне CDN для всех пользователей города.
+        Р’РѕР·РІСЂР°С‰Р°РµС‚ Р±РёРЅР°СЂРЅС‹Р№ РІРµРєС‚РѕСЂРЅС‹Р№ С‚Р°Р№Р» Mapbox Vector Tile (.pbf), СЃРѕРґРµСЂР¶Р°С‰РёР№ Р·РѕРЅС‹ Р±РµР·РѕРїР°СЃРЅРѕСЃС‚Рё РґР»СЏ СѓРєР°Р·Р°РЅРЅРѕРіРѕ РіРѕСЂРѕРґР°.
+        Р”РѕСЃС‚СѓРїРЅРѕ С‚РѕР»СЊРєРѕ РґР»СЏ РјР°СЃС€С‚Р°Р±РѕРІ (zoom) РѕС‚ 12 РґРѕ 18.
+        Р”Р°РЅРЅС‹Р№ URL Р·Р°РІРёСЃРёС‚ С‚РѕР»СЊРєРѕ РѕС‚ РіРѕСЂРѕРґР° Рё РІРµСЂСЃРёРё, С‡С‚Рѕ РїРѕР·РІРѕР»СЏРµС‚ РєСЌС€РёСЂРѕРІР°С‚СЊ С‚Р°Р№Р»С‹ РЅР° СѓСЂРѕРІРЅРµ CDN РґР»СЏ РІСЃРµС… РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ РіРѕСЂРѕРґР°.
       operationId: getMapTile
       security: []
       parameters:
@@ -463,7 +463,7 @@ paths:
           required: true
           schema:
             type: string
-          description: Идентификатор города (например, "ekb").
+          description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ РіРѕСЂРѕРґР° (РЅР°РїСЂРёРјРµСЂ, "ekb").
         - name: z
           in: path
           required: true
@@ -487,10 +487,10 @@ paths:
           required: false
           schema:
             type: string
-          description: Версия генерации карты (кэш-бастер). Получается из эндпоинта метаданных города.
+          description: Р’РµСЂСЃРёСЏ РіРµРЅРµСЂР°С†РёРё РєР°СЂС‚С‹ (РєСЌС€-Р±Р°СЃС‚РµСЂ). РџРѕР»СѓС‡Р°РµС‚СЃСЏ РёР· СЌРЅРґРїРѕРёРЅС‚Р° РјРµС‚Р°РґР°РЅРЅС‹С… РіРѕСЂРѕРґР°.
       responses:
         "200":
-          description: Vector tile data (.pbf). Для пустых тайлов возвращается пустой массив байт (0 байт).
+          description: Vector tile data (.pbf). Р”Р»СЏ РїСѓСЃС‚С‹С… С‚Р°Р№Р»РѕРІ РІРѕР·РІСЂР°С‰Р°РµС‚СЃСЏ РїСѓСЃС‚РѕР№ РјР°СЃСЃРёРІ Р±Р°Р№С‚ (0 Р±Р°Р№С‚).
           content:
             application/vnd.mapbox-vector-tile:
               schema:
@@ -524,7 +524,7 @@ paths:
       tags:
         - Maps
       summary: Get city map metadata (version/bbox)
-      description: Возвращает метаданные города, включая версию последней генерации карты (generationVersion) для сброса кэша MVT на клиенте.
+      description: Р’РѕР·РІСЂР°С‰Р°РµС‚ РјРµС‚Р°РґР°РЅРЅС‹Рµ РіРѕСЂРѕРґР°, РІРєР»СЋС‡Р°СЏ РІРµСЂСЃРёСЋ РїРѕСЃР»РµРґРЅРµР№ РіРµРЅРµСЂР°С†РёРё РєР°СЂС‚С‹ (generationVersion) РґР»СЏ СЃР±СЂРѕСЃР° РєСЌС€Р° MVT РЅР° РєР»РёРµРЅС‚Рµ.
       operationId: getCityMetadata
       security: []
       parameters:
@@ -533,7 +533,7 @@ paths:
           required: true
           schema:
             type: string
-          description: Идентификатор города.
+          description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ РіРѕСЂРѕРґР°.
       responses:
         "200":
           description: City metadata
@@ -549,7 +549,7 @@ paths:
                     type: string
                   generationVersion:
                     type: string
-                    description: Таймстемп или хеш версии последней перегенерации базовой карты.
+                    description: РўР°Р№РјСЃС‚РµРјРї РёР»Рё С…РµС€ РІРµСЂСЃРёРё РїРѕСЃР»РµРґРЅРµР№ РїРµСЂРµРіРµРЅРµСЂР°С†РёРё Р±Р°Р·РѕРІРѕР№ РєР°СЂС‚С‹.
                   bbox:
                     $ref: "#/components/schemas/MapCityBbox"
         "404":
@@ -853,7 +853,6 @@ components:
       properties:
         login:
           type: string
-          description: Email или телефон.
         password:
           type: string
           format: password
@@ -866,7 +865,6 @@ components:
       properties:
         login:
           type: string
-          description: Email или телефон.
         password:
           type: string
           format: password
@@ -981,10 +979,10 @@ components:
         name:
           type: string
           nullable: true
-          description: Название семьи (опционально).
+          description: РќР°Р·РІР°РЅРёРµ СЃРµРјСЊРё (РѕРїС†РёРѕРЅР°Р»СЊРЅРѕ).
         cityId:
           type: string
-          description: Идентификатор города семьи (например, "ekb").
+          description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ РіРѕСЂРѕРґР° СЃРµРјСЊРё (РЅР°РїСЂРёРјРµСЂ, "ekb").
 
     CreateFamilyResponse:
       type: object
@@ -1020,7 +1018,11 @@ components:
           format: uuid
         role:
           type: string
-          description: Роль участника в семье (Parent, Child).
+          description: Family member role (Parent, Child).
+        displayName:
+          type: string
+        login:
+          type: string
 
     CreateInviteCodeRequest:
       type: object
@@ -1032,7 +1034,7 @@ components:
           enum:
             - Parent
             - Child
-          description: Роль, для которой создаётся код (Parent или Child).
+          description: Р РѕР»СЊ, РґР»СЏ РєРѕС‚РѕСЂРѕР№ СЃРѕР·РґР°С‘С‚СЃСЏ РєРѕРґ (Parent РёР»Рё Child).
 
     CreateInviteCodeResponse:
       type: object
@@ -1041,7 +1043,7 @@ components:
       properties:
         inviteCode:
           type: string
-          description: Одноразовый код приглашения.
+          description: РћРґРЅРѕСЂР°Р·РѕРІС‹Р№ РєРѕРґ РїСЂРёРіР»Р°С€РµРЅРёСЏ.
 
     JoinFamilyByInviteCodeRequest:
       type: object
@@ -1056,7 +1058,7 @@ components:
           enum:
             - Parent
             - Child
-          description: Роль пользователя, которая должна совпадать с ролью inviteCode.
+          description: Р РѕР»СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ, РєРѕС‚РѕСЂР°СЏ РґРѕР»Р¶РЅР° СЃРѕРІРїР°РґР°С‚СЊ СЃ СЂРѕР»СЊСЋ inviteCode.
 
     JoinFamilyByInviteCodeResponse:
       type: object
@@ -1073,7 +1075,7 @@ components:
           format: uuid
         role:
           type: string
-          description: Роль, присвоенная пользователю в семье.
+          description: Р РѕР»СЊ, РїСЂРёСЃРІРѕРµРЅРЅР°СЏ РїРѕР»СЊР·РѕРІР°С‚РµР»СЋ РІ СЃРµРјСЊРµ.
 
     RiskLevel:
       type: string
@@ -1132,7 +1134,7 @@ components:
           example: ekb
         name:
           type: string
-          example: Екатеринбург
+          example: Р•РєР°С‚РµСЂРёРЅР±СѓСЂРі
         bbox:
           nullable: true
           $ref: "#/components/schemas/MapCityBbox"

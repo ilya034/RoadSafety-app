@@ -256,7 +256,7 @@ fun MemberItem(member: FamilyMemberEntity) {
             Surface(modifier = Modifier.size(40.dp), shape = CircleShape, color = Color.White) {}
             Spacer(modifier = Modifier.width(12.dp))
             Column {
-                Text(text = "User ${member.userId}", color = Color.White, fontWeight = FontWeight.Bold)
+                Text(text = member.displayLabel, color = Color.White, fontWeight = FontWeight.Bold)
                 Text(text = if (member.role == UserRole.PARENT) "Родитель" else "Ребенок", color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
             }
         }

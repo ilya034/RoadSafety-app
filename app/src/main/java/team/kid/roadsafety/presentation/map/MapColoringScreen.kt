@@ -10,17 +10,30 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddLocationAlt
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -55,6 +68,7 @@ import org.maplibre.compose.expressions.dsl.switch
 import org.maplibre.compose.expressions.value.ColorValue
 import org.maplibre.compose.layers.CircleLayer
 import org.maplibre.compose.layers.FillLayer
+import org.maplibre.compose.layers.LineLayer
 import org.maplibre.compose.map.MaplibreMap
 import org.maplibre.compose.sources.GeoJsonData
 import org.maplibre.compose.sources.TileSetOptions
@@ -63,9 +77,12 @@ import org.maplibre.compose.sources.rememberVectorSource
 import org.maplibre.compose.style.BaseStyle
 import org.maplibre.compose.util.ClickResult
 import org.maplibre.spatialk.geojson.FeatureCollection
+import org.maplibre.spatialk.geojson.LineString
 import org.maplibre.spatialk.geojson.Point
+import org.maplibre.spatialk.geojson.Polygon
 import org.maplibre.spatialk.geojson.Position
 import team.kid.roadsafety.domain.aggregates.map.GeoPoint
+import team.kid.roadsafety.domain.aggregates.map.MapArea
 import team.kid.roadsafety.domain.aggregates.map.MapAreaColor
 import team.kid.roadsafety.domain.aggregates.map.MapCityBbox
 import org.maplibre.spatialk.geojson.Feature as GeoJsonFeature
@@ -115,10 +132,11 @@ fun MapColoringScreen(
         }
     }
 
-    val childLocationSource = remember(state.childLocations) {
-        if (state.childLocations.isNotEmpty()) {
+    val visibleChildLocations = state.visibleChildLocations
+    val childLocationSource = remember(visibleChildLocations) {
+        if (visibleChildLocations.isNotEmpty()) {
             FeatureCollection(
-                state.childLocations.map { child ->
+                visibleChildLocations.map { child ->
                     GeoJsonFeature(
                         Point(Position(child.point.longitude, child.point.latitude)),
                         JsonObject(
@@ -136,6 +154,30 @@ fun MapColoringScreen(
         } else {
             FeatureCollection(emptyList<GeoJsonFeature<Point, JsonObject>>())
         }
+    }
+
+    val customAreasSource = remember(state.customAreas) {
+        customAreasFeatureCollection(state.customAreas)
+    }
+
+    val draftFillSource = remember(state.draftPoints, state.draftRisk) {
+        draftPolygonFeatureCollection(state.draftPoints, state.draftRisk)
+    }
+
+    val draftLineSource = remember(state.draftPoints, state.draftRisk) {
+        draftLineFeatureCollection(state.draftPoints, state.draftRisk)
+    }
+
+    val draftPointsSource = remember(state.draftPoints) {
+        FeatureCollection(
+            state.draftPoints.mapIndexed { index, point ->
+                GeoJsonFeature(
+                    Point(Position(point.longitude, point.latitude)),
+                    JsonObject(mapOf("index" to JsonPrimitive(index))),
+                    null
+                )
+            }
+        )
     }
 
     var didCenterInitialCity by remember { mutableStateOf(false) }
@@ -159,7 +201,20 @@ fun MapColoringScreen(
         MaplibreMap(
             modifier = Modifier.fillMaxSize(),
             baseStyle = baseStyle,
-            cameraState = cameraState
+            cameraState = cameraState,
+            onMapClick = { position, _ ->
+                if (state.isCreatingCustomArea && state.canEditMap) {
+                    viewModel.onMapPointClicked(
+                        GeoPoint(
+                            latitude = position.latitude,
+                            longitude = position.longitude
+                        )
+                    )
+                    ClickResult.Consume
+                } else {
+                    ClickResult.Pass
+                }
+            }
         ) {
              state.tileUrl?.let { tileUrl ->
                 key(tileUrl) {
@@ -197,62 +252,129 @@ fun MapColoringScreen(
                 }
             }
 
-            if (state.currentLocation != null) {
-                key(state.currentLocation) {
-                    val locationGeoJsonData = remember(currentLocationSource) {
-                        GeoJsonData.Features(currentLocationSource)
-                    }
-                    val locationGeoJsonSource = rememberGeoJsonSource(
-                        data = locationGeoJsonData
-                    )
-                    CircleLayer(
-                        id = "current-location-marker",
-                        source = locationGeoJsonSource,
-                        color = const(Color.Blue),
-                        radius = const(8.dp),
-                        strokeColor = const(Color.White),
-                        strokeWidth = const(2.dp)
-                    )
-                }
+            val customGeoJsonData = remember(customAreasSource) {
+                customAreasSource.toSafeGeoJsonData()
             }
+            val customGeoJsonSource = rememberGeoJsonSource(
+                data = customGeoJsonData
+            )
+            FillLayer(
+                id = "custom-safety-zones-layer",
+                source = customGeoJsonSource,
+                color = customAreaColorExpression(),
+                opacity = const(0.45f),
+                outlineColor = const(Color(0xFF263238))
+            )
 
-            if (state.childLocations.isNotEmpty()) {
-                key(state.childLocations) {
-                    val childrenGeoJsonData = remember(childLocationSource) {
-                        GeoJsonData.Features(childLocationSource)
-                    }
-                    val childrenGeoJsonSource = rememberGeoJsonSource(
-                        data = childrenGeoJsonData
-                    )
-                    CircleLayer(
-                        id = "children-location-markers",
-                        source = childrenGeoJsonSource,
-                        color = childRiskColorExpression(),
-                        radius = const(9.dp),
-                        strokeColor = const(Color.White),
-                        strokeWidth = const(2.dp)
-                    )
-                }
+            val draftGeoJsonData = remember(draftFillSource) {
+                draftFillSource.toSafeGeoJsonData()
             }
+            val draftGeoJsonSource = rememberGeoJsonSource(
+                data = draftGeoJsonData
+            )
+            FillLayer(
+                id = "draft-custom-zone-fill",
+                source = draftGeoJsonSource,
+                color = const(state.draftRisk.toComposeColor()),
+                opacity = const(0.28f),
+                outlineColor = const(state.draftRisk.toComposeColor())
+            )
+
+            val draftLineGeoJsonData = remember(draftLineSource) {
+                draftLineSource.toSafeGeoJsonData()
+            }
+            val draftLineGeoJsonSource = rememberGeoJsonSource(
+                data = draftLineGeoJsonData
+            )
+            LineLayer(
+                id = "draft-custom-zone-line",
+                source = draftLineGeoJsonSource,
+                color = const(state.draftRisk.toComposeColor()),
+                width = const(3.dp)
+            )
+
+            val draftPointGeoJsonData = remember(draftPointsSource) {
+                draftPointsSource.toSafeGeoJsonData()
+            }
+            val draftPointGeoJsonSource = rememberGeoJsonSource(
+                data = draftPointGeoJsonData
+            )
+            CircleLayer(
+                id = "draft-custom-zone-points",
+                source = draftPointGeoJsonSource,
+                color = const(Color.White),
+                radius = const(5.dp),
+                strokeColor = const(state.draftRisk.toComposeColor()),
+                strokeWidth = const(2.dp)
+            )
+
+            val locationGeoJsonData = remember(currentLocationSource) {
+                currentLocationSource.toSafeGeoJsonData()
+            }
+            val locationGeoJsonSource = rememberGeoJsonSource(
+                data = locationGeoJsonData
+            )
+            CircleLayer(
+                id = "current-location-marker",
+                source = locationGeoJsonSource,
+                color = const(Color.Blue),
+                radius = const(8.dp),
+                strokeColor = const(Color.White),
+                strokeWidth = const(2.dp)
+            )
+
+            val childrenGeoJsonData = remember(childLocationSource) {
+                childLocationSource.toSafeGeoJsonData()
+            }
+            val childrenGeoJsonSource = rememberGeoJsonSource(
+                data = childrenGeoJsonData
+            )
+            CircleLayer(
+                id = "children-location-markers",
+                source = childrenGeoJsonSource,
+                color = childRiskColorExpression(),
+                radius = const(9.dp),
+                strokeColor = const(Color.White),
+                strokeWidth = const(2.dp)
+            )
         }
 
         if (state.canEditMap) {
+            ZoneTargetDropdown(
+                targets = state.zoneTargets,
+                selectedTarget = state.selectedZoneTarget,
+                onTargetSelected = viewModel::onZoneTargetSelected,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(16.dp)
+            )
+
             PaintPanel(
                 selectedColor = state.activePaintColor,
                 onColorSelected = viewModel::onPaintColorSelected,
+                onCreateCustomArea = viewModel::startCustomAreaDraft,
+                isCreatingCustomArea = state.isCreatingCustomArea,
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .padding(end = 16.dp)
             )
-        }
 
-        if (state.isParent && state.childLocations.isNotEmpty()) {
-            ChildrenLegend(
-                children = state.childLocations,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(16.dp)
-            )
+            if (state.isCreatingCustomArea) {
+                CustomAreaDraftPanel(
+                    targetLabel = state.selectedZoneTarget.label,
+                    selectedRisk = state.draftRisk,
+                    pointCount = state.draftPoints.distinct().size,
+                    canSave = state.canSaveCustomArea,
+                    isSaving = state.isSavingCustomArea,
+                    onRiskSelected = viewModel::onDraftRiskSelected,
+                    onUndo = viewModel::undoDraftPoint,
+                    onCancel = viewModel::cancelCustomAreaDraft,
+                    onSave = viewModel::saveCustomAreaDraft,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(16.dp)
+                )
+            }
         }
 
         if (state.isLoading) {
@@ -277,49 +399,6 @@ fun MapColoringScreen(
     }
 }
 
-@Composable
-private fun ChildrenLegend(
-    children: List<ChildMapLocation>,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier.width(180.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-        shape = MaterialTheme.shapes.medium
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            children.take(5).forEach { child ->
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .clip(CircleShape)
-                            .background(child.currentRisk.toRiskColor())
-                    )
-                    Text(
-                        text = child.label,
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 1
-                    )
-                }
-            }
-        }
-    }
-}
-
-private fun String.toRiskColor(): Color = when {
-    equals("Red", ignoreCase = true) -> Color(0xFFC62828)
-    equals("Yellow", ignoreCase = true) -> Color(0xFFF9A825)
-    equals("Green", ignoreCase = true) -> Color(0xFF2E7D32)
-    else -> Color(0xFF1565C0)
-}
-
 private fun childRiskColorExpression(): Expression<ColorValue> {
     return switch(
         input = feature["risk"].convertToString(),
@@ -328,6 +407,80 @@ private fun childRiskColorExpression(): Expression<ColorValue> {
         case(listOf("Red", "red", "RED"), const(Color(0xFFC62828))),
         fallback = const(Color(0xFF1565C0))
     )
+}
+
+private fun customAreaColorExpression(): Expression<ColorValue> {
+    return switch(
+        input = feature["risk"].convertToString(),
+        case(listOf("GREEN"), const(MapAreaColor.GREEN.toComposeColor())),
+        case(listOf("YELLOW"), const(MapAreaColor.YELLOW.toComposeColor())),
+        case(listOf("RED"), const(MapAreaColor.RED.toComposeColor())),
+        fallback = const(Color(0xFF607D8B))
+    )
+}
+
+private fun customAreasFeatureCollection(areas: List<MapArea>): FeatureCollection<Polygon, JsonObject> {
+    return FeatureCollection(
+        areas.mapNotNull { area ->
+            val ring = area.points.toClosedPositions()
+            if (ring.size < 4) return@mapNotNull null
+            GeoJsonFeature(
+                Polygon(listOf(ring)),
+                JsonObject(
+                    mapOf(
+                        "id" to JsonPrimitive(area.id.value.toString()),
+                        "risk" to JsonPrimitive(area.color.name)
+                    )
+                ),
+                null
+            )
+        }
+    )
+}
+
+private fun draftPolygonFeatureCollection(
+    points: List<GeoPoint>,
+    risk: MapAreaColor
+): FeatureCollection<Polygon, JsonObject> {
+    val ring = points.toClosedPositions()
+    return if (ring.size >= 4) {
+        FeatureCollection(
+            listOf(
+                GeoJsonFeature(
+                    Polygon(listOf(ring)),
+                    JsonObject(mapOf("risk" to JsonPrimitive(risk.name))),
+                    null
+                )
+            )
+        )
+    } else {
+        FeatureCollection(emptyList<GeoJsonFeature<Polygon, JsonObject>>())
+    }
+}
+
+private fun draftLineFeatureCollection(
+    points: List<GeoPoint>,
+    risk: MapAreaColor
+): FeatureCollection<LineString, JsonObject> {
+    return if (points.size >= 2) {
+        FeatureCollection(
+            listOf(
+                GeoJsonFeature(
+                    LineString(points.map { Position(it.longitude, it.latitude) }),
+                    JsonObject(mapOf("risk" to JsonPrimitive(risk.name))),
+                    null
+                )
+            )
+        )
+    } else {
+        FeatureCollection(emptyList<GeoJsonFeature<LineString, JsonObject>>())
+    }
+}
+
+private fun List<GeoPoint>.toClosedPositions(): List<Position> {
+    if (isEmpty()) return emptyList()
+    val closed = if (first() == last()) this else this + first()
+    return closed.map { Position(it.longitude, it.latitude) }
 }
 
 private const val MapBaseStyleUrl = "https://tiles.openfreemap.org/styles/bright"
@@ -383,10 +536,74 @@ private fun MapCityBbox.defaultZoom(): Double {
     }
 }
 
+private fun FeatureCollection<*, *>.toSafeGeoJsonData(): GeoJsonData {
+    return if (this.isEmpty()) {
+        GeoJsonData.JsonString("""{"type":"FeatureCollection","features":[]}""")
+    } else {
+        GeoJsonData.Features(this)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ZoneTargetDropdown(
+    targets: List<ZoneTarget>,
+    selectedTarget: ZoneTarget,
+    onTargetSelected: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = modifier.width(220.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)
+        ),
+        shape = MaterialTheme.shapes.small
+    ) {
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { expanded = it },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            OutlinedTextField(
+                value = selectedTarget.label,
+                onValueChange = {},
+                readOnly = true,
+                singleLine = true,
+                label = { Text("Зоны") },
+                trailingIcon = {
+                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+                },
+                modifier = Modifier
+                    .menuAnchor()
+                    .fillMaxWidth()
+            )
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                targets.forEach { target ->
+                    DropdownMenuItem(
+                        text = { Text(target.label) },
+                        onClick = {
+                            expanded = false
+                            onTargetSelected(target.id)
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun PaintPanel(
     selectedColor: MapAreaColor?,
     onColorSelected: (MapAreaColor?) -> Unit,
+    onCreateCustomArea: () -> Unit,
+    isCreatingCustomArea: Boolean,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -447,6 +664,114 @@ fun PaintPanel(
                     else
                         MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+
+            FilledIconButton(
+                onClick = onCreateCustomArea,
+                modifier = Modifier.size(40.dp),
+                colors = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = if (isCreatingCustomArea)
+                        MaterialTheme.colorScheme.primaryContainer
+                    else
+                        MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.AddLocationAlt,
+                    contentDescription = "Новая зона",
+                    tint = if (isCreatingCustomArea)
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CustomAreaDraftPanel(
+    targetLabel: String,
+    selectedRisk: MapAreaColor,
+    pointCount: Int,
+    canSave: Boolean,
+    isSaving: Boolean,
+    onRiskSelected: (MapAreaColor) -> Unit,
+    onUndo: () -> Unit,
+    onCancel: () -> Unit,
+    onSave: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = targetLabel,
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                    Text(
+                        text = "Точек: $pointCount",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilledIconButton(
+                        onClick = onUndo,
+                        enabled = pointCount > 0,
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(Icons.Filled.Undo, contentDescription = "Отменить точку")
+                    }
+                    FilledIconButton(
+                        onClick = onCancel,
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(Icons.Filled.Close, contentDescription = "Отменить")
+                    }
+                    FilledIconButton(
+                        onClick = onSave,
+                        enabled = canSave && !isSaving,
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(Icons.Filled.Save, contentDescription = "Сохранить")
+                    }
+                }
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(MapAreaColor.RED, MapAreaColor.YELLOW, MapAreaColor.GREEN).forEach { risk ->
+                    TextButton(
+                        onClick = { onRiskSelected(risk) },
+                        modifier = Modifier
+                            .border(
+                                width = if (selectedRisk == risk) 2.dp else 1.dp,
+                                color = if (selectedRisk == risk)
+                                    MaterialTheme.colorScheme.primary
+                                else
+                                    MaterialTheme.colorScheme.outline,
+                                shape = MaterialTheme.shapes.small
+                            )
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(12.dp)
+                                .clip(CircleShape)
+                                .background(risk.toComposeColor())
+                        )
+                    }
+                }
             }
         }
     }

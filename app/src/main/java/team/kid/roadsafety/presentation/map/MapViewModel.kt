@@ -5,15 +5,20 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import team.kid.roadsafety.domain.FamilyId
+import team.kid.roadsafety.domain.UserId
 import team.kid.roadsafety.BuildConfig
+import team.kid.roadsafety.domain.aggregates.family.FamilyMemberEntity
 import team.kid.roadsafety.domain.aggregates.family.FamilyRepository
 import team.kid.roadsafety.domain.aggregates.map.GeoPoint
+import team.kid.roadsafety.domain.aggregates.map.MapArea
 import team.kid.roadsafety.domain.aggregates.map.MapAreaColor
 import team.kid.roadsafety.domain.aggregates.map.MapCity
 import team.kid.roadsafety.domain.aggregates.map.MapCityBbox
@@ -43,6 +48,7 @@ class MapViewModel @Inject constructor(
 
     private var initializationJob: Job? = null
     private var childrenLocationPollingJob: Job? = null
+    private var alertZonesSyncJob: Job? = null
     private var requestedMapCityId: String? = null
 
     init {
@@ -61,11 +67,15 @@ class MapViewModel @Inject constructor(
         initializationJob = null
         childrenLocationPollingJob?.cancel()
         childrenLocationPollingJob = null
+        alertZonesSyncJob?.cancel()
+        alertZonesSyncJob = null
     }
 
     private suspend fun initializeMap() {
         childrenLocationPollingJob?.cancel()
         childrenLocationPollingJob = null
+        alertZonesSyncJob?.cancel()
+        alertZonesSyncJob = null
         requestedMapCityId = null
 
         _uiState.update {
@@ -92,10 +102,39 @@ class MapViewModel @Inject constructor(
                 cities = cities
             )
         }
-        loadCity(activeCity.cityId, familyId)
+        if (familyId != null && isParent) {
+            loadZoneTargets(familyId)
+        }
         if (isParent) {
             startChildrenLocationPolling()
         }
+        loadCity(activeCity.cityId, familyId)
+    }
+
+    private suspend fun loadZoneTargets(familyId: String) {
+        familyRepository.getFamilyMembers(FamilyId(UUID.fromString(familyId)))
+            .fold(
+                onSuccess = { members ->
+                    val childTargets = members
+                        .filter { it.role == UserRole.CHILD }
+                        .map { member -> member.toZoneTarget(_uiState.value.childLocations) }
+                    _uiState.update { state ->
+                        val targets = listOf(ZoneTarget.AllFamily) + childTargets
+                        state.copy(
+                            zoneTargets = targets,
+                            selectedZoneTarget = targets.firstOrNull { target ->
+                                target.id == state.selectedZoneTarget.id
+                            } ?: ZoneTarget.AllFamily,
+                            error = null
+                        )
+                    }
+                },
+                onFailure = { error ->
+                    _uiState.update {
+                        it.copy(error = error.message ?: "Failed to load children")
+                    }
+                }
+            )
     }
 
     private suspend fun loadCity(cityId: String, familyId: String?) {
@@ -107,7 +146,9 @@ class MapViewModel @Inject constructor(
         loadCachedCity(cityId, familyId)
         styleJob.join()
 
-        if (!networkMonitor.isOnline()) {
+        val isOnline = networkMonitor.isOnline()
+        _uiState.update { it.copy(isOnline = isOnline) }
+        if (!isOnline) {
             _uiState.update { it.copy(isLoading = false) }
             return
         }
@@ -143,9 +184,13 @@ class MapViewModel @Inject constructor(
 
         if (familyId != null) {
             loadOverrides(familyId)
-            syncAlertZones(cityId, familyId)
+            syncAlertZonesInBackground(
+                cityId = cityId,
+                familyId = familyId,
+                childId = _uiState.value.selectedZoneTarget.childUserId()
+            )
         } else {
-            _uiState.update { it.copy(overrides = emptyMap()) }
+            _uiState.update { it.copy(overrides = emptyMap(), customAreas = emptyList()) }
         }
     }
 
@@ -172,17 +217,23 @@ class MapViewModel @Inject constructor(
                 trackingRepository.getChildrenLocations()
                     .fold(
                         onSuccess = { response ->
+                            val childLocations = response.children.map { child ->
+                                ChildMapLocation(
+                                    childId = child.childId,
+                                    displayName = child.displayName,
+                                    point = GeoPoint(child.latitude, child.longitude),
+                                    currentRisk = child.currentRisk.name,
+                                    lastUpdatedAt = child.lastUpdatedAt
+                                )
+                            }
                             _uiState.update {
+                                val refreshedTargets = it.zoneTargets.refreshChildLabels(childLocations)
                                 it.copy(
-                                    childLocations = response.children.map { child ->
-                                        ChildMapLocation(
-                                            childId = child.childId,
-                                            displayName = child.displayName,
-                                            point = GeoPoint(child.latitude, child.longitude),
-                                            currentRisk = child.currentRisk.name,
-                                            lastUpdatedAt = child.lastUpdatedAt
-                                        )
-                                    },
+                                    childLocations = childLocations,
+                                    zoneTargets = refreshedTargets,
+                                    selectedZoneTarget = refreshedTargets.firstOrNull { target ->
+                                        target.id == it.selectedZoneTarget.id
+                                    } ?: it.selectedZoneTarget,
                                     error = null
                                 )
                             }
@@ -199,20 +250,29 @@ class MapViewModel @Inject constructor(
         }
     }
 
-    private suspend fun loadOverrides(familyId: String) {
-        mapRepository.getUserAreas(familyId)
+    private suspend fun loadOverrides(
+        familyId: String,
+        childId: UserId? = _uiState.value.selectedZoneTarget.childUserId()
+    ) {
+        mapRepository.getUserAreas(familyId, childId)
             .fold(
                 onSuccess = { areas ->
+                    if (_uiState.value.selectedZoneTarget.childUserId() != childId) return@fold
                     _uiState.update {
                         it.copy(
                             overrides = areas
+                                .filter { area -> area.baseAreaKey != null }
                                 .mapNotNull { area -> area.baseAreaKey?.let { key -> key to area.color } }
                                 .toMap(),
+                            customAreas = areas.filter { area ->
+                                area.baseAreaKey == null && area.points.isNotEmpty()
+                            },
                             error = null
                         )
                     }
                 },
                 onFailure = { error ->
+                    if (_uiState.value.selectedZoneTarget.childUserId() != childId) return@fold
                     _uiState.update {
                         it.copy(error = error.message ?: "Failed to load map overrides")
                     }
@@ -220,9 +280,38 @@ class MapViewModel @Inject constructor(
             )
     }
 
-    private suspend fun syncAlertZones(cityId: String, familyId: String) {
-        mapRepository.getAlertZones(cityId, familyId)
+    private fun applyCachedOverrides(familyId: String, childId: UserId?): Boolean {
+        val cachedAreas = mapRepository.getCachedUserAreas(familyId, childId) ?: return false
+        _uiState.update {
+            it.copy(
+                overrides = cachedAreas
+                    .filter { area -> area.baseAreaKey != null }
+                    .mapNotNull { area -> area.baseAreaKey?.let { key -> key to area.color } }
+                    .toMap(),
+                customAreas = cachedAreas.filter { area ->
+                    area.baseAreaKey == null && area.points.isNotEmpty()
+                },
+                error = null
+            )
+        }
+        return true
+    }
+
+    private fun syncAlertZonesInBackground(cityId: String, familyId: String, childId: UserId?) {
+        alertZonesSyncJob?.cancel()
+        alertZonesSyncJob = viewModelScope.launch {
+            syncAlertZones(cityId, familyId, childId)
+        }
+    }
+
+    private suspend fun syncAlertZones(
+        cityId: String,
+        familyId: String,
+        childId: UserId? = _uiState.value.selectedZoneTarget.childUserId()
+    ) {
+        mapRepository.getAlertZones(cityId, familyId, childId)
             .onFailure { error ->
+                if (_uiState.value.selectedZoneTarget.childUserId() != childId) return@onFailure
                 _uiState.update {
                     it.copy(error = error.message ?: "Failed to sync alert zones")
                 }
@@ -231,10 +320,13 @@ class MapViewModel @Inject constructor(
 
     private fun loadCachedCity(cityId: String, familyId: String?) {
         val cachedMetadata = mapRepository.getCachedCityMetadata(cityId)
-        val cachedOverrides = familyId
-            ?.let { mapRepository.getCachedUserAreas(it) }
+        val cachedAreas = familyId
+            ?.let { mapRepository.getCachedUserAreas(it, _uiState.value.selectedZoneTarget.childUserId()) }
+        val cachedOverrides = cachedAreas
             ?.mapNotNull { area -> area.baseAreaKey?.let { key -> key to area.color } }
             ?.toMap()
+        val cachedCustomAreas = cachedAreas
+            ?.filter { area -> area.baseAreaKey == null && area.points.isNotEmpty() }
 
         if (cachedMetadata != null || cachedOverrides != null) {
             _uiState.update {
@@ -246,6 +338,7 @@ class MapViewModel @Inject constructor(
                         buildTileUrl(cityId, metadata.generationVersion)
                     } ?: it.tileUrl,
                     overrides = cachedOverrides ?: it.overrides,
+                    customAreas = cachedCustomAreas ?: it.customAreas,
                     error = null
                 )
             }
@@ -267,7 +360,7 @@ class MapViewModel @Inject constructor(
     fun onPaintColorSelected(color: MapAreaColor?) {
         if (!_uiState.value.canEditMap) return
 
-        _uiState.update { it.copy(activePaintColor = color) }
+        _uiState.update { it.copy(activePaintColor = color, isCreatingCustomArea = false, draftPoints = emptyList()) }
     }
 
     fun onBaseAreaClicked(baseAreaKey: String) {
@@ -285,11 +378,19 @@ class MapViewModel @Inject constructor(
                 return@launch
             }
 
+            val childId = _uiState.value.selectedZoneTarget.childUserId()
+            if (childId != null && !networkMonitor.isOnline()) {
+                _uiState.update { it.copy(isOnline = false, error = "Network required to update a child zone") }
+                return@launch
+            }
+
             _uiState.update { it.copy(isLoading = true, error = null) }
-            val result = mapRepository.updateBaseAreaColor(baseAreaKey, familyId, color)
+            val result = mapRepository.updateBaseAreaColor(baseAreaKey, familyId, color, childId)
 
             result.fold(
                 onSuccess = {
+                    loadOverrides(familyId)
+                    syncAlertZones(_uiState.value.activeMapCityId, familyId)
                     _uiState.update { state ->
                         state.copy(
                             isLoading = false,
@@ -298,12 +399,21 @@ class MapViewModel @Inject constructor(
                     }
                 },
                 onFailure = { error ->
-                    _uiState.update { state ->
-                        state.copy(
-                            isLoading = false,
-                            overrides = state.overrides + (baseAreaKey to color),
-                            error = "Note: Local update only (API Error: ${error.message})"
-                        )
+                    if (childId == null) {
+                        _uiState.update { state ->
+                            state.copy(
+                                isLoading = false,
+                                overrides = state.overrides + (baseAreaKey to color),
+                                error = "Note: Local update only (API Error: ${error.message})"
+                            )
+                        }
+                    } else {
+                        _uiState.update { state ->
+                            state.copy(
+                                isLoading = false,
+                                error = error.message ?: "Failed to update child zone"
+                            )
+                        }
                     }
                 }
             )
@@ -315,7 +425,7 @@ class MapViewModel @Inject constructor(
             val familyId = _uiState.value.familyId
             if (familyId == null) {
                 familyRepository.setSelectedCityId(cityId)
-                _uiState.update { it.copy(familyCityId = cityId, overrides = emptyMap()) }
+                _uiState.update { it.copy(familyCityId = cityId, overrides = emptyMap(), customAreas = emptyList()) }
                 loadCity(cityId, null)
                 return@launch
             }
@@ -327,7 +437,7 @@ class MapViewModel @Inject constructor(
             )
             result.fold(
                 onSuccess = {
-                    _uiState.update { it.copy(familyCityId = cityId, overrides = emptyMap()) }
+                    _uiState.update { it.copy(familyCityId = cityId, overrides = emptyMap(), customAreas = emptyList()) }
                     loadCity(cityId, familyId)
                 },
                 onFailure = { error ->
@@ -349,7 +459,10 @@ class MapViewModel @Inject constructor(
                     it.copy(
                         isLoading = true,
                         activePaintColor = null,
+                        isCreatingCustomArea = false,
+                        draftPoints = emptyList(),
                         overrides = emptyMap(),
+                        customAreas = emptyList(),
                         error = null
                     )
                 }
@@ -372,7 +485,121 @@ class MapViewModel @Inject constructor(
     }
 
     fun dismissAreaSelection() {
-        _uiState.update { it.copy(activePaintColor = null) }
+        _uiState.update { it.copy(activePaintColor = null, isCreatingCustomArea = false, draftPoints = emptyList()) }
+    }
+
+    fun onZoneTargetSelected(targetId: String) {
+        val state = _uiState.value
+        if (!state.canEditMap || targetId == state.selectedZoneTarget.id) return
+        val target = state.zoneTargets.firstOrNull { it.id == targetId } ?: return
+        val childId = target.childUserId()
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    selectedZoneTarget = target,
+                    activePaintColor = null,
+                    isCreatingCustomArea = false,
+                    draftPoints = emptyList(),
+                    error = null
+                )
+            }
+            val familyId = _uiState.value.familyId
+            if (familyId != null) {
+                val hadCachedOverrides = applyCachedOverrides(familyId, childId)
+                if (!hadCachedOverrides) {
+                    _uiState.update { it.copy(overrides = emptyMap(), customAreas = emptyList()) }
+                }
+                loadOverrides(familyId, childId)
+                syncAlertZonesInBackground(_uiState.value.activeMapCityId, familyId, childId)
+            }
+        }
+    }
+
+    fun startCustomAreaDraft() {
+        if (!_uiState.value.canEditMap) return
+
+        val isOnline = networkMonitor.isOnline()
+        _uiState.update {
+            it.copy(
+                isCreatingCustomArea = true,
+                activePaintColor = null,
+                draftPoints = emptyList(),
+                draftRisk = MapAreaColor.YELLOW,
+                isOnline = isOnline,
+                error = null
+            )
+        }
+    }
+
+    fun onMapPointClicked(point: GeoPoint) {
+        val state = _uiState.value
+        if (!state.canEditMap || !state.isCreatingCustomArea) return
+
+        _uiState.update { it.copy(draftPoints = it.draftPoints + point) }
+    }
+
+    fun onDraftRiskSelected(risk: MapAreaColor) {
+        if (!_uiState.value.canEditMap) return
+
+        _uiState.update { it.copy(draftRisk = risk) }
+    }
+
+    fun undoDraftPoint() {
+        if (!_uiState.value.canEditMap) return
+
+        _uiState.update { state ->
+            state.copy(draftPoints = state.draftPoints.dropLast(1))
+        }
+    }
+
+    fun cancelCustomAreaDraft() {
+        _uiState.update {
+            it.copy(isCreatingCustomArea = false, draftPoints = emptyList())
+        }
+    }
+
+    fun saveCustomAreaDraft() {
+        val state = _uiState.value
+        val familyId = state.familyId
+        if (!state.canSaveCustomArea || familyId == null) return
+
+        viewModelScope.launch {
+            if (!networkMonitor.isOnline()) {
+                _uiState.update { it.copy(isOnline = false, error = "Network required to create a zone") }
+                return@launch
+            }
+
+            _uiState.update { it.copy(isOnline = true, isSavingCustomArea = true, error = null) }
+            val result = mapRepository.createCustomArea(
+                familyId = familyId,
+                childId = _uiState.value.selectedZoneTarget.childUserId(),
+                risk = _uiState.value.draftRisk,
+                points = _uiState.value.draftPoints
+            )
+            result.fold(
+                onSuccess = {
+                    loadOverrides(familyId)
+                    syncAlertZones(_uiState.value.activeMapCityId, familyId)
+                    _uiState.update {
+                        it.copy(
+                            isSavingCustomArea = false,
+                            isCreatingCustomArea = false,
+                            draftPoints = emptyList(),
+                            error = null
+                        )
+                    }
+                },
+                onFailure = { error ->
+                    _uiState.update {
+                        it.copy(
+                            isSavingCustomArea = false,
+                            error = error.message ?: "Failed to create custom zone"
+                        )
+                    }
+                }
+            )
+        }
     }
 
     fun clearError() {
@@ -411,14 +638,31 @@ data class MapUiState(
     val tileUrl: String? = null,
     val mapStyleJson: String? = null,
     val overrides: Map<String, MapAreaColor> = emptyMap(),
+    val customAreas: List<MapArea> = emptyList(),
+    val zoneTargets: List<ZoneTarget> = listOf(ZoneTarget.AllFamily),
+    val selectedZoneTarget: ZoneTarget = ZoneTarget.AllFamily,
     val activePaintColor: MapAreaColor? = null,
+    val isCreatingCustomArea: Boolean = false,
+    val draftPoints: List<GeoPoint> = emptyList(),
+    val draftRisk: MapAreaColor = MapAreaColor.YELLOW,
+    val isSavingCustomArea: Boolean = false,
+    val isOnline: Boolean = true,
     val isLoading: Boolean = false,
     val error: String? = null,
     val currentLocation: GeoPoint? = null,
     val childLocations: List<ChildMapLocation> = emptyList()
 ) {
+    val visibleChildLocations: List<ChildMapLocation>
+        get() = when (val target = selectedZoneTarget) {
+            ZoneTarget.AllFamily -> childLocations
+            is ZoneTarget.Child -> childLocations.filter { child -> child.childId == target.childId }
+        }
+
     val canEditMap: Boolean
         get() = familyId != null && isParent && activeMapCityId == familyCityId
+
+    val canSaveCustomArea: Boolean
+        get() = canEditMap && isOnline && !isSavingCustomArea && draftPoints.distinct().size >= 3
 }
 
 private fun MapCityBbox.contains(point: GeoPoint): Boolean {
@@ -434,4 +678,39 @@ data class ChildMapLocation(
 ) {
     val label: String
         get() = displayName.ifBlank { "Child ${childId.take(8)}" }
+}
+
+sealed class ZoneTarget(
+    open val id: String,
+    open val label: String
+) {
+    data object AllFamily : ZoneTarget("all", "Вся семья")
+
+    data class Child(
+        val childId: String,
+        override val label: String
+    ) : ZoneTarget("child:$childId", label)
+}
+
+private fun ZoneTarget.childUserId(): UserId? {
+    return when (this) {
+        ZoneTarget.AllFamily -> null
+        is ZoneTarget.Child -> runCatching { UserId(UUID.fromString(childId)) }.getOrNull()
+    }
+}
+
+private fun FamilyMemberEntity.toZoneTarget(childLocations: List<ChildMapLocation>): ZoneTarget.Child {
+    val childLabel = childLocations.firstOrNull { it.childId == userId }?.label
+        ?: displayLabel
+    return ZoneTarget.Child(childId = userId, label = childLabel)
+}
+
+private fun List<ZoneTarget>.refreshChildLabels(children: List<ChildMapLocation>): List<ZoneTarget> {
+    return map { target ->
+        if (target is ZoneTarget.Child) {
+            target.copy(label = children.firstOrNull { it.childId == target.childId }?.label ?: target.label)
+        } else {
+            target
+        }
+    }
 }

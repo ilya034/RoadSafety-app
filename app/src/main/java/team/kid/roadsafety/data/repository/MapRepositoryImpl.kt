@@ -15,6 +15,9 @@ import team.kid.roadsafety.domain.aggregates.map.MapRepository
 import team.kid.roadsafety.infrastructure.parseErrorMessage
 import java.util.UUID
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CancellationException
 
 class MapRepositoryImpl @Inject constructor(
     private val api: RoadSafetyApi,
@@ -41,8 +44,8 @@ class MapRepositoryImpl @Inject constructor(
         return cache.getCityMetadata(cityId)?.toDomain()
     }
 
-    override suspend fun getUserAreas(familyId: String, childId: UserId?): Result<List<MapArea>> {
-        return try {
+    override suspend fun getUserAreas(familyId: String, childId: UserId?): Result<List<MapArea>> = withContext(Dispatchers.IO) {
+        try {
             val response = api.getUserAreas(familyId, childId?.value?.toString())
             if (response.isSuccessful) {
                 val body = response.body()
@@ -55,34 +58,39 @@ class MapRepositoryImpl @Inject constructor(
                     ?: Result.failure(Exception(response.parseErrorMessage("Failed to fetch user areas")))
             }
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             cachedUserAreas(familyId, childId) ?: Result.failure(e)
         }
     }
 
-    override suspend fun getAlertZones(cityId: String, familyId: String, childId: UserId?): Result<List<AlertZone>> {
-        return try {
+    override suspend fun getAlertZones(cityId: String, familyId: String, childId: UserId?): Result<List<AlertZone>> = withContext(Dispatchers.IO) {
+        try {
             val childKey = childId?.value?.toString()
             val response = api.getAlertZones(cityId, familyId, childKey)
             if (response.isSuccessful) {
                 val body = response.body()
                 if (body != null) {
-                    cache.saveAlertZones(cityId, familyId, childKey, body)
+                    body.use { b ->
+                        cache.saveAlertZonesStream(cityId, familyId, childKey, b.byteStream())
+                    }
                 }
-                Result.success(body?.zones?.map { it.toAlertZone() } ?: emptyList())
+                val cached = cache.getAlertZones(cityId, familyId, childKey)
+                Result.success(cached?.zones?.map { it.toAlertZone() } ?: emptyList())
             } else {
                 cachedAlertZones(cityId, familyId, childId)
                     ?: Result.failure(Exception(response.parseErrorMessage("Failed to fetch alert zones")))
             }
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             cachedAlertZones(cityId, familyId, childId) ?: Result.failure(e)
         }
     }
 
-    override suspend fun getCityMetadata(cityId: String): Result<MapCityMetadata> {
-        return try {
+    override suspend fun getCityMetadata(cityId: String): Result<MapCityMetadata> = withContext(Dispatchers.IO) {
+        try {
             val response = api.getCityMetadata(cityId)
             if (response.isSuccessful) {
-                val body = response.body() ?: return Result.failure(Exception("City metadata response is empty"))
+                val body = response.body() ?: return@withContext Result.failure(Exception("City metadata response is empty"))
                 cache.saveCityMetadata(cityId, body)
                 Result.success(body.toDomain())
             } else {
@@ -90,6 +98,7 @@ class MapRepositoryImpl @Inject constructor(
                     ?: Result.failure(Exception(response.parseErrorMessage("Failed to fetch city metadata")))
             }
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             cachedCityMetadata(cityId) ?: Result.failure(e)
         }
     }
@@ -100,8 +109,8 @@ class MapRepositoryImpl @Inject constructor(
         return updateBaseAreaColor(baseAreaKey, familyId, color, childId)
     }
 
-    override suspend fun updateBaseAreaColor(baseAreaKey: String, familyId: String, color: MapAreaColor, childId: UserId?): Result<Unit> {
-        return try {
+    override suspend fun updateBaseAreaColor(baseAreaKey: String, familyId: String, color: MapAreaColor, childId: UserId?): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
             val request = team.kid.roadsafety.data.dto.CreateBaseAreaOverrideRequestDto(
                 familyId = familyId,
                 childId = childId?.value?.toString(),
@@ -120,6 +129,33 @@ class MapRepositoryImpl @Inject constructor(
                 Result.failure(Exception(response.parseErrorMessage("Failed to update area color")))
             }
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun createCustomArea(
+        familyId: String,
+        childId: UserId?,
+        risk: MapAreaColor,
+        points: List<GeoPoint>
+    ): Result<MapArea> = withContext(Dispatchers.IO) {
+        try {
+            val request = team.kid.roadsafety.data.dto.CreateCustomUserMapAreaRequestDto(
+                familyId = familyId,
+                childId = childId?.value?.toString(),
+                risk = risk.toRiskLevelDto(),
+                geometry = buildPolygonGeometry(points)
+            )
+            val response = api.createCustomUserMapArea(request)
+            if (response.isSuccessful) {
+                val body = response.body() ?: return@withContext Result.failure(Exception("Custom area response is empty"))
+                Result.success(body.toMapArea())
+            } else {
+                Result.failure(Exception(response.parseErrorMessage("Failed to create custom area")))
+            }
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
             Result.failure(e)
         }
     }
@@ -146,18 +182,16 @@ class MapRepositoryImpl @Inject constructor(
     }
 
     private fun team.kid.roadsafety.data.dto.GeoJsonGeometryDto?.toGeoPoints(): List<GeoPoint> {
-        val coordsArray = this?.coordinates as? kotlinx.serialization.json.JsonArray
-        val firstRing = coordsArray?.firstOrNull() as? kotlinx.serialization.json.JsonArray
-        return firstRing?.mapNotNull { pointElement ->
-            val pointArray = pointElement as? kotlinx.serialization.json.JsonArray
-            if (pointArray != null && pointArray.size >= 2) {
-                val lon = (pointArray[0] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toDoubleOrNull() ?: 0.0
-                val lat = (pointArray[1] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toDoubleOrNull() ?: 0.0
-                GeoPoint(latitude = lat, longitude = lon)
-            } else {
-                null
-            }
-        } ?: emptyList()
+        return this?.coordinates ?: emptyList()
+    }
+
+    private fun MapAreaColor.toRiskLevelDto(): team.kid.roadsafety.data.dto.RiskLevelDto {
+        return when (this) {
+            MapAreaColor.GREEN -> team.kid.roadsafety.data.dto.RiskLevelDto.Green
+            MapAreaColor.YELLOW -> team.kid.roadsafety.data.dto.RiskLevelDto.Yellow
+            MapAreaColor.RED -> team.kid.roadsafety.data.dto.RiskLevelDto.Red
+            MapAreaColor.NONE -> team.kid.roadsafety.data.dto.RiskLevelDto.Green
+        }
     }
 
     private fun cachedUserAreas(familyId: String, childId: UserId?): Result<List<MapArea>>? {
@@ -192,4 +226,16 @@ class MapRepositoryImpl @Inject constructor(
             }
         )
     }
+}
+
+internal fun buildPolygonGeometry(points: List<GeoPoint>): team.kid.roadsafety.data.dto.GeoJsonGeometryDto {
+    val closedRing = if (points.firstOrNull() == points.lastOrNull()) {
+        points
+    } else {
+        points + points.first()
+    }
+    return team.kid.roadsafety.data.dto.GeoJsonGeometryDto(
+        type = "Polygon",
+        coordinates = closedRing
+    )
 }

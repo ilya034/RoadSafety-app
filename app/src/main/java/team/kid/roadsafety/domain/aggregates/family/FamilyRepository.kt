@@ -30,5 +30,10 @@ data class FamilyMemberEntity(
     val familyId: FamilyId,
     val userId: String,
     val role: UserRole,
-    val joinedAt: String
-)
+    val joinedAt: String,
+    val displayName: String = "",
+    val login: String = ""
+) {
+    val displayLabel: String
+        get() = displayName.ifBlank { login }.ifBlank { "User ${userId.take(8)}" }
+}

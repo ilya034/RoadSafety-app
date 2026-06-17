@@ -12,4 +12,5 @@ interface MapRepository {
     fun getCachedCityMetadata(cityId: String): MapCityMetadata?
     suspend fun updateAreaColor(area: MapArea, familyId: String, color: MapAreaColor, childId: UserId? = null): Result<Unit>
     suspend fun updateBaseAreaColor(baseAreaKey: String, familyId: String, color: MapAreaColor, childId: UserId? = null): Result<Unit>
+    suspend fun createCustomArea(familyId: String, childId: UserId?, risk: MapAreaColor, points: List<GeoPoint>): Result<MapArea>
 }

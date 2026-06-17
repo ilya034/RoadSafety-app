@@ -73,7 +73,15 @@ class LocationTrackingService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startForeground(NOTIFICATION_ID, createNotification())
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIFICATION_ID,
+                createNotification(),
+                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, createNotification())
+        }
         requestLocationUpdates()
         return START_STICKY
     }

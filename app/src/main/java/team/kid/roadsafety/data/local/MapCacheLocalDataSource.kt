@@ -2,8 +2,10 @@ package team.kid.roadsafety.data.local
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromStream
 import team.kid.roadsafety.data.dto.AlertZonesResponseDto
 import team.kid.roadsafety.data.dto.MapCitiesResponseDto
 import team.kid.roadsafety.data.dto.MapCityMetadataDto
@@ -38,6 +40,7 @@ class MapCacheLocalDataSource @Inject constructor(
             .apply()
     }
 
+    @OptIn(ExperimentalSerializationApi::class)
     fun getAlertZones(cityId: String, familyId: String, childId: String?): AlertZonesResponseDto? {
         val key = alertZonesKey(cityId, familyId, childId)
         if (prefs.contains(key)) {
@@ -53,10 +56,29 @@ class MapCacheLocalDataSource @Inject constructor(
         val file = getAlertZonesFile(cityId, familyId, childId)
         if (!file.exists()) return null
         return try {
-            file.readText().decodeOrNull()
+            file.inputStream().use { input ->
+                json.decodeFromStream<AlertZonesResponseDto>(input)
+            }
         } catch (e: Exception) {
             null
         }
+    }
+
+    fun saveAlertZonesStream(cityId: String, familyId: String, childId: String?, inputStream: java.io.InputStream) {
+        try {
+            val file = getAlertZonesFile(cityId, familyId, childId)
+            file.outputStream().use { output ->
+                inputStream.copyTo(output)
+            }
+        } catch (_: Exception) {}
+
+        val key = alertZonesKey(cityId, familyId, childId)
+        prefs.edit()
+            .remove(key)
+            .putString(ActiveAlertCityIdKey, cityId)
+            .putString(ActiveAlertFamilyIdKey, familyId)
+            .putString(ActiveAlertChildIdKey, childId)
+            .apply()
     }
 
     fun saveAlertZones(cityId: String, familyId: String, childId: String?, zones: AlertZonesResponseDto) {

@@ -50,5 +50,7 @@ data class GetFamilyMembersResponseDto(
 @Serializable
 data class MemberDto(
     val id: String,
-    val role: String
+    val role: String,
+    val displayName: String = "",
+    val login: String = ""
 )

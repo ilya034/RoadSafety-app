@@ -136,7 +136,9 @@ class FamilyRepositoryImpl @Inject constructor(
                         familyId = familyId,
                         userId = bodyMember.id,
                         role = UserRole.fromString(bodyMember.role) ?: UserRole.CHILD,
-                        joinedAt = ""
+                        joinedAt = "",
+                        displayName = bodyMember.displayName,
+                        login = bodyMember.login
                     )
                 })
             } else {
@@ -151,7 +153,9 @@ class FamilyRepositoryImpl @Inject constructor(
                         familyId = familyId,
                         userId = bodyMember.id,
                         role = UserRole.fromString(bodyMember.role) ?: UserRole.CHILD,
-                        joinedAt = ""
+                        joinedAt = "",
+                        displayName = bodyMember.displayName,
+                        login = bodyMember.login
                     )
                 })
             } else {

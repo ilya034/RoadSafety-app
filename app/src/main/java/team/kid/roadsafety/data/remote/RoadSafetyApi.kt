@@ -1,5 +1,6 @@
 package team.kid.roadsafety.data.remote
 
+import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.*
 import team.kid.roadsafety.data.dto.*
@@ -61,7 +62,7 @@ interface RoadSafetyApi {
         @Query("cityId") cityId: String,
         @Query("familyId") familyId: String,
         @Query("childId") childId: String? = null
-    ): Response<AlertZonesResponseDto>
+    ): Response<ResponseBody>
 
     @POST("maps/user-areas/base-overrides")
     suspend fun createBaseAreaOverride(
