@@ -28,8 +28,8 @@ android {
         applicationId = "team.kid.roadsafety"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "0.1.2"
 
         buildConfigField("String", "MAPTILER_KEY", "\"$maptilerKey\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
