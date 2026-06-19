@@ -3,6 +3,8 @@ package team.kid.roadsafety.infrastructure.map
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -35,6 +37,8 @@ class MapTileCacheService @Inject constructor(
     }
 
     private val stylePrefs = context.getSharedPreferences("map_style_cache", Context.MODE_PRIVATE)
+    private val warmupMutex = Mutex()
+    private val activeWarmups = mutableSetOf<String>()
 
     private val tileOkHttpClient: OkHttpClient by lazy {
         okHttpClient.newBuilder()
@@ -122,24 +126,31 @@ class MapTileCacheService @Inject constructor(
         if (bbox == null) return
 
         val key = "warmed_${cityId}"
-        val savedVersion = stylePrefs.getString(key, null)
-        if (savedVersion == generationVersion) {
+        val warmupKey = "$cityId:$generationVersion"
+        val shouldWarm = warmupMutex.withLock {
+            val savedVersion = stylePrefs.getString(key, null)
+            savedVersion != generationVersion && activeWarmups.add(warmupKey)
+        }
+        if (!shouldWarm) {
             return
         }
 
-        withContext(Dispatchers.Main) {
-            offlineManager.setOfflineMapboxTileCountLimit(OfflineTileLimit)
-            val region = findRegion(cityId)
-            if (region == null) {
-                createOfflineRegion(cityId, styleUrl, bbox)
-            } else {
-                region.invalidateSuspend()
+        try {
+            withContext(Dispatchers.Main) {
+                offlineManager.setOfflineMapboxTileCountLimit(OfflineTileLimit)
+                if (findRegion(cityId) == null) {
+                    createOfflineRegion(cityId, styleUrl, bbox)
+                }
+            }
+
+            warmSafetyTiles(tileUrlTemplate, bbox, generationVersion)
+
+            stylePrefs.edit().putString(key, generationVersion).apply()
+        } finally {
+            warmupMutex.withLock {
+                activeWarmups.remove(warmupKey)
             }
         }
-
-        warmSafetyTiles(tileUrlTemplate, bbox, generationVersion)
-
-        stylePrefs.edit().putString(key, generationVersion).apply()
     }
 
     private suspend fun createOfflineRegion(
@@ -280,20 +291,6 @@ class MapTileCacheService @Inject constructor(
                     }
                 }
             )
-        }
-    }
-
-    private suspend fun OfflineRegion.invalidateSuspend() {
-        suspendCancellableCoroutine<Unit> { continuation ->
-            invalidate(object : OfflineRegion.OfflineRegionInvalidateCallback {
-                override fun onInvalidate() {
-                    if (continuation.isActive) continuation.resume(Unit)
-                }
-
-                override fun onError(error: String) {
-                    if (continuation.isActive) continuation.resume(Unit)
-                }
-            })
         }
     }
 
