@@ -106,7 +106,13 @@ class MapViewModel @Inject constructor(
         val currentUser = userResult.getOrNull()
         val familyId = currentUser?.familyId
         val isParent = UserRole.fromString(currentUser?.familyRole) == UserRole.PARENT
-        val familyCityId = familyRepository.getSelectedCityId() ?: DefaultCityId
+        var familyCityId = familyRepository.getSelectedCityId() ?: DefaultCityId
+        if (familyId != null) {
+            val familyResult = familyRepository.getFamily(team.kid.roadsafety.domain.FamilyId(java.util.UUID.fromString(familyId)))
+            familyResult.getOrNull()?.let { family ->
+                familyCityId = family.cityId
+            }
+        }
         val cities = familyRepository.getSupportedCities().getOrDefault(listOf(DefaultCity))
         val activeCity = cities.firstOrNull { it.cityId == familyCityId } ?: cities.firstOrNull() ?: DefaultCity
 
@@ -553,7 +559,7 @@ class MapViewModel @Inject constructor(
             val familyId = _uiState.value.familyId
             if (familyId == null) {
                 familyRepository.setSelectedCityId(cityId)
-                _uiState.update { it.copy(familyCityId = cityId, overrides = emptyMap(), customAreas = emptyList(), lastCameraPosition = null) }
+                _uiState.update { it.copy(familyCityId = cityId, overrides = emptyMap(), customAreas = emptyList(), lastCameraPosition = null, isCameraInitialized = false) }
                 loadCity(cityId, null)
                 return@launch
             }
@@ -565,7 +571,7 @@ class MapViewModel @Inject constructor(
             )
             result.fold(
                 onSuccess = {
-                    _uiState.update { it.copy(familyCityId = cityId, overrides = emptyMap(), customAreas = emptyList(), lastCameraPosition = null) }
+                    _uiState.update { it.copy(familyCityId = cityId, overrides = emptyMap(), customAreas = emptyList(), lastCameraPosition = null, isCameraInitialized = false) }
                     loadCity(cityId, familyId)
                 },
                 onFailure = { error ->
@@ -591,6 +597,7 @@ class MapViewModel @Inject constructor(
                         isCreatingCustomArea = false,
                         draftPoints = emptyList(),
                         lastCameraPosition = null,
+                        isCameraInitialized = false,
                         error = null
                     )
                 }
@@ -744,7 +751,7 @@ class MapViewModel @Inject constructor(
                             error = null
                         )
                     }
-                    refreshMapEditsInBackground(familyId, childId)
+                    refreshMapEditsInBackground(familyId, childId, refreshAlertZones = false)
                 },
                 onFailure = { error ->
                     _uiState.update {
@@ -784,7 +791,7 @@ class MapViewModel @Inject constructor(
             mapRepository.deleteCustomArea(area.id)
                 .fold(
                     onSuccess = {
-                        refreshMapEditsInBackground(familyId, childId)
+                        refreshMapEditsInBackground(familyId, childId, refreshAlertZones = false)
                     },
                     onFailure = { error ->
                         _uiState.update { state ->
@@ -812,13 +819,20 @@ class MapViewModel @Inject constructor(
         return "$apiRoot/maps/tiles/$cityId/{z}/{x}/{y}.pbf?v=$encodedVersion"
     }
 
-    private fun refreshMapEditsInBackground(familyId: String, childId: UserId?) {
+    private fun refreshMapEditsInBackground(familyId: String, childId: UserId?, refreshAlertZones: Boolean = true) {
         viewModelScope.launch { loadOverrides(familyId, childId) }
-        viewModelScope.launch { syncAlertZones(_uiState.value.activeMapCityId, familyId, childId) }
+        if (refreshAlertZones) {
+            viewModelScope.launch { syncAlertZones(_uiState.value.activeMapCityId, familyId, childId) }
+        }
     }
 
     fun updateCameraPosition(position: CameraPosition) {
+        if (!_uiState.value.isCameraInitialized) return
         _uiState.update { it.copy(lastCameraPosition = position) }
+    }
+
+    fun markCameraInitialized() {
+        _uiState.update { it.copy(isCameraInitialized = true) }
     }
 
     fun forceRefresh() {
@@ -871,6 +885,7 @@ data class MapUiState(
     val isSavingCustomArea: Boolean = false,
     val isOnline: Boolean = true,
     val isLoading: Boolean = false,
+    val isCameraInitialized: Boolean = false,
     val error: String? = null,
     val currentLocation: GeoPoint? = null,
     val childLocations: List<ChildMapLocation> = emptyList(),
@@ -894,6 +909,9 @@ data class MapUiState(
 
     val canEraseAreas: Boolean
         get() = canEditMap
+
+    val canTrackCameraCity: Boolean
+        get() = isCameraInitialized && cities.isNotEmpty()
 }
 
 private fun MapCityBbox.contains(point: GeoPoint): Boolean {

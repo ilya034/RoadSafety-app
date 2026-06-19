@@ -6,6 +6,7 @@ import kotlinx.serialization.json.Json
 import team.kid.roadsafety.data.dto.CreateFamilyRequestDto
 import team.kid.roadsafety.data.dto.CreateInviteCodeRequestDto
 import team.kid.roadsafety.data.dto.GetFamilyMembersResponseDto
+import team.kid.roadsafety.data.dto.FamilyResponseDto
 import team.kid.roadsafety.data.dto.JoinFamilyByInviteCodeRequestDto
 import team.kid.roadsafety.data.dto.MapCityDto
 import team.kid.roadsafety.data.dto.UpdateFamilyCityRequestDto
@@ -41,7 +42,8 @@ class FamilyRepositoryImpl @Inject constructor(
                     FamilyEntity(
                         id = FamilyId(UUID.fromString(body.familyId)),
                         name = name,
-                        createdAt = "" // Removed from contract
+                        createdAt = "", // Removed from contract
+                        cityId = cityId
                     )
                 )
             } else {
@@ -82,6 +84,28 @@ class FamilyRepositoryImpl @Inject constructor(
                 Result.success(Unit)
             } else {
                 Result.failure(Exception(response.parseErrorMessage("Family city update failed")))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun getFamily(familyId: FamilyId): Result<FamilyEntity> {
+        return try {
+            val response = api.getFamily(familyId.value.toString())
+            if (response.isSuccessful) {
+                val body = response.body()!!
+                setSelectedCityId(body.cityId)
+                Result.success(
+                    FamilyEntity(
+                        id = FamilyId(UUID.fromString(body.id)),
+                        name = body.name ?: "",
+                        createdAt = "",
+                        cityId = body.cityId
+                    )
+                )
+            } else {
+                Result.failure(Exception(response.parseErrorMessage("Family retrieval failed")))
             }
         } catch (e: Exception) {
             Result.failure(e)

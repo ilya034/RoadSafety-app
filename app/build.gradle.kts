@@ -15,7 +15,7 @@ val localProperties = Properties().apply {
         file.inputStream().use { load(it) }
     }
 }
-val maptilerKey = localProperties.getProperty("maptiler.key") ?: "YOUR_MAPTILER_KEY"
+val maptilerKey = localProperties.getProperty("maptiler.key") ?: "MAPTILER_API_KEY"
 
 android {
     namespace = "team.kid.roadsafety"
@@ -29,8 +29,8 @@ android {
         applicationId = "team.kid.roadsafety"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.1.2"
+        versionCode = 5
+        versionName = "0.1.4"
 
         buildConfigField("String", "MAPTILER_KEY", "\"$maptilerKey\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

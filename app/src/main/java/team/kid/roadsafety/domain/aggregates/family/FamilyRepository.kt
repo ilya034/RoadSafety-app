@@ -11,6 +11,7 @@ interface FamilyRepository {
     suspend fun getFamilyMembers(familyId: FamilyId): Result<List<FamilyMemberEntity>>
     suspend fun getSupportedCities(): Result<List<MapCity>>
     suspend fun updateFamilyCity(familyId: FamilyId, cityId: String): Result<Unit>
+    suspend fun getFamily(familyId: FamilyId): Result<FamilyEntity>
 
     fun setSelectedRole(role: UserRole)
     fun getSelectedRole(): UserRole?
@@ -22,7 +23,8 @@ interface FamilyRepository {
 data class FamilyEntity(
     val id: FamilyId,
     val name: String,
-    val createdAt: String
+    val createdAt: String,
+    val cityId: String = ""
 )
 
 data class FamilyMemberEntity(
