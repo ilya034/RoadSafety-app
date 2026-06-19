@@ -149,6 +149,10 @@ class MapRepositoryImpl @Inject constructor(
             val response = api.createCustomUserMapArea(request)
             if (response.isSuccessful) {
                 val body = response.body() ?: return@withContext Result.failure(Exception("Custom area response is empty"))
+                val childKey = childId?.value?.toString()
+                body.toAlertZoneDto()?.let { alertZone ->
+                    cache.upsertActiveAlertZone(familyId, childKey, alertZone)
+                }
                 Result.success(body.toMapArea())
             } else {
                 Result.failure(Exception(response.parseErrorMessage("Failed to create custom area")))
@@ -179,8 +183,10 @@ class MapRepositoryImpl @Inject constructor(
 
     override suspend fun deleteCustomArea(areaId: AreaId): Result<Unit> = withContext(Dispatchers.IO) {
         try {
+            val areaIdValue = areaId.value.toString()
             val response = api.deleteCustomArea(areaId.value.toString())
             if (response.isSuccessful || response.code() == 404) {
+                cache.removeActiveAlertZone(areaIdValue)
                 Result.success(Unit)
             } else {
                 Result.failure(Exception(response.parseErrorMessage("Failed to delete custom zone")))
@@ -200,6 +206,19 @@ class MapRepositoryImpl @Inject constructor(
             color = MapAreaColor.fromString(properties.risk.name),
             points = geometry.toGeoPoints(),
             cityId = null
+        )
+    }
+
+    private fun team.kid.roadsafety.data.dto.UserMapAreaFeatureDto.toAlertZoneDto(): team.kid.roadsafety.data.dto.AlertZoneDto? {
+        val geometry = geometry ?: return null
+        val risk = properties.risk
+        if (risk == team.kid.roadsafety.data.dto.RiskLevelDto.Green) return null
+        return team.kid.roadsafety.data.dto.AlertZoneDto(
+            id = properties.id,
+            baseAreaKey = properties.baseAreaKey,
+            risk = risk,
+            source = properties.source,
+            geometry = geometry
         )
     }
 

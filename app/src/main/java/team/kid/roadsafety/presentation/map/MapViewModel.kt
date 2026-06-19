@@ -744,7 +744,7 @@ class MapViewModel @Inject constructor(
                             error = null
                         )
                     }
-                    refreshMapEditsInBackground(familyId, childId)
+                    refreshMapEditsInBackground(familyId, childId, refreshAlertZones = false)
                 },
                 onFailure = { error ->
                     _uiState.update {
@@ -784,7 +784,7 @@ class MapViewModel @Inject constructor(
             mapRepository.deleteCustomArea(area.id)
                 .fold(
                     onSuccess = {
-                        refreshMapEditsInBackground(familyId, childId)
+                        refreshMapEditsInBackground(familyId, childId, refreshAlertZones = false)
                     },
                     onFailure = { error ->
                         _uiState.update { state ->
@@ -812,9 +812,11 @@ class MapViewModel @Inject constructor(
         return "$apiRoot/maps/tiles/$cityId/{z}/{x}/{y}.pbf?v=$encodedVersion"
     }
 
-    private fun refreshMapEditsInBackground(familyId: String, childId: UserId?) {
+    private fun refreshMapEditsInBackground(familyId: String, childId: UserId?, refreshAlertZones: Boolean = true) {
         viewModelScope.launch { loadOverrides(familyId, childId) }
-        viewModelScope.launch { syncAlertZones(_uiState.value.activeMapCityId, familyId, childId) }
+        if (refreshAlertZones) {
+            viewModelScope.launch { syncAlertZones(_uiState.value.activeMapCityId, familyId, childId) }
+        }
     }
 
     fun updateCameraPosition(position: CameraPosition) {
