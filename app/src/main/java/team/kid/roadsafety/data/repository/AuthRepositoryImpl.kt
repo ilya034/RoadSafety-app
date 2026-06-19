@@ -1,6 +1,7 @@
 package team.kid.roadsafety.data.repository
 
 import team.kid.roadsafety.data.dto.AuthResponseDto
+import team.kid.roadsafety.data.dto.LogOutRequestDto
 import team.kid.roadsafety.data.dto.LoginRequestDto
 import team.kid.roadsafety.data.dto.RegisterRequestDto
 import team.kid.roadsafety.data.dto.UserResponseDto
@@ -80,6 +81,14 @@ class AuthRepositoryImpl @Inject constructor(
     }
 
     override suspend fun logout(): Result<Unit> {
+        val tokens = tokenManager.getTokens()
+        if (tokens != null) {
+            try {
+                api.logout(LogOutRequestDto(tokens.refreshToken))
+            } catch (e: Exception) {
+                // Best effort log out
+            }
+        }
         pushTokenSynchronizer.deleteCurrentTokenBestEffort()
         tokenManager.clearTokens()
         return Result.success(Unit)

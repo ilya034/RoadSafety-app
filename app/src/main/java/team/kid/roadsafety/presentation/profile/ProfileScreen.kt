@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -33,6 +34,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -47,6 +51,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import team.kid.roadsafety.data.dto.UserResponseDto
 import team.kid.roadsafety.domain.aggregates.family.FamilyMemberEntity
+import team.kid.roadsafety.domain.aggregates.map.MapCity
 import team.kid.roadsafety.domain.aggregates.user.UserRole
 import team.kid.roadsafety.presentation.theme.ButtonGreen
 
@@ -76,7 +81,13 @@ fun ProfileScreen(
                     }
 
                     item {
-                        PersonalInfoSection(user = user, members = state.members)
+                        PersonalInfoSection(
+                            user = user, 
+                            members = state.members, 
+                            cityName = state.cityName,
+                            supportedCities = state.supportedCities,
+                            onCityChange = { viewModel.updateFamilyCity(it) }
+                        )
                     }
 
                     val currentUserRole = state.members.find { it.userId == user.id }?.role ?: UserRole.fromString(user.familyRole)
@@ -167,8 +178,15 @@ fun ProfileHeader(user: UserResponseDto, onLogout: () -> Unit) {
 }
 
 @Composable
-fun PersonalInfoSection(user: UserResponseDto, members: List<FamilyMemberEntity>) {
-    val currentUserRole = members.find { it.userId == user.id }?.role
+fun PersonalInfoSection(
+    user: UserResponseDto, 
+    members: List<FamilyMemberEntity>, 
+    cityName: String?,
+    supportedCities: List<MapCity>,
+    onCityChange: (String) -> Unit
+) {
+    val currentUserRole = members.find { it.userId == user.id }?.role ?: UserRole.fromString(user.familyRole)
+    var showCityDialog by remember { mutableStateOf(false) }
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -193,12 +211,33 @@ fun PersonalInfoSection(user: UserResponseDto, members: List<FamilyMemberEntity>
                     value = if (currentUserRole == UserRole.PARENT) "Родитель" else "Ребенок"
                 )
             }
+            
+            if (cityName != null) {
+                InfoRow(
+                    label = "Город семьи:", 
+                    value = cityName,
+                    onEditClick = if (currentUserRole == UserRole.PARENT) {
+                        { showCityDialog = true }
+                    } else null
+                )
+            }
         }
+    }
+
+    if (showCityDialog) {
+        CitySelectionDialog(
+            cities = supportedCities,
+            onCitySelected = { 
+                onCityChange(it.cityId)
+                showCityDialog = false
+            },
+            onDismiss = { showCityDialog = false }
+        )
     }
 }
 
 @Composable
-fun InfoRow(label: String, value: String) {
+fun InfoRow(label: String, value: String, onEditClick: (() -> Unit)? = null) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Surface(
             color = ButtonGreen,
@@ -219,15 +258,70 @@ fun InfoRow(label: String, value: String) {
         Surface(
             color = Color.White,
             shape = RoundedCornerShape(15.dp),
-            modifier = Modifier.fillMaxWidth().height(40.dp)
+            modifier = Modifier.weight(1f).height(40.dp)
         ) {
-            Box(contentAlignment = Alignment.CenterStart) {
+            Row(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
                 Text(
                     value, 
-                    modifier = Modifier.padding(horizontal = 12.dp), 
                     color = Color.Black,
-                    fontSize = 14.sp
+                    fontSize = 14.sp,
+                    modifier = Modifier.weight(1f)
                 )
+                if (onEditClick != null) {
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = "Edit",
+                        modifier = Modifier.size(16.dp).clickable { onEditClick() },
+                        tint = Color.Gray
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CitySelectionDialog(
+    cities: List<MapCity>,
+    onCitySelected: (MapCity) -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = Color.White,
+            modifier = Modifier.padding(16.dp).fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    "Выберите город семьи",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+                LazyColumn(modifier = Modifier.height(300.dp)) {
+                    items(cities.size) { index ->
+                        val city = cities[index]
+                        Text(
+                            text = city.name,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onCitySelected(city) }
+                                .padding(vertical = 12.dp),
+                            fontSize = 16.sp
+                        )
+                    }
+                }
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text("Отмена", color = ButtonGreen)
+                }
             }
         }
     }

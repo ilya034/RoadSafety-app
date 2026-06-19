@@ -14,6 +14,7 @@ import team.kid.roadsafety.BuildConfig
 import team.kid.roadsafety.data.remote.RoadSafetyApi
 import team.kid.roadsafety.infrastructure.AuthInterceptor
 import team.kid.roadsafety.infrastructure.TokenAuthenticator
+import java.time.Duration
 import javax.inject.Singleton
 
 @Module
@@ -50,6 +51,10 @@ object NetworkModule {
         }
 
         return OkHttpClient.Builder()
+            .connectTimeout(Duration.ofSeconds(10))
+            .readTimeout(Duration.ofSeconds(20))
+            .writeTimeout(Duration.ofSeconds(20))
+            .callTimeout(Duration.ofSeconds(30))
             .addInterceptor(authInterceptor)
             .authenticator(tokenAuthenticator)
             .addInterceptor(safeLoggingInterceptor)

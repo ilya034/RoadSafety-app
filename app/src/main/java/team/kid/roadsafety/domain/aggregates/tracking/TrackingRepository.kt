@@ -9,4 +9,6 @@ interface TrackingRepository {
     suspend fun getChildrenLocations(): Result<ChildLocationsResponseDto>
     suspend fun getNotifications(unreadOnly: Boolean = false): Result<NotificationsResponseDto>
     suspend fun markNotificationRead(id: String): Result<Unit>
+    fun clearData()
 }
+

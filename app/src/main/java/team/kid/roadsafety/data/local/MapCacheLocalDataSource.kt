@@ -5,6 +5,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromStream
+import team.kid.roadsafety.data.dto.AlertZoneDto
 import team.kid.roadsafety.data.dto.AlertZonesResponseDto
 import team.kid.roadsafety.data.dto.MapCitiesResponseDto
 import team.kid.roadsafety.data.dto.MapCityMetadataDto
@@ -95,6 +96,46 @@ class MapCacheLocalDataSource @Inject constructor(
             .apply()
     }
 
+    fun upsertAlertZone(cityId: String, familyId: String, childId: String?, zone: AlertZoneDto) {
+        val current = getAlertZones(cityId, familyId, childId) ?: return
+        saveAlertZones(
+            cityId = cityId,
+            familyId = familyId,
+            childId = childId,
+            zones = current.copy(
+                zones = current.zones.filterNot { it.id == zone.id } + zone
+            )
+        )
+    }
+
+    fun upsertActiveAlertZone(familyId: String, childId: String?, zone: AlertZoneDto) {
+        val cityId = prefs.getString(ActiveAlertCityIdKey, null) ?: return
+        val activeFamilyId = prefs.getString(ActiveAlertFamilyIdKey, null) ?: return
+        val activeChildId = prefs.getString(ActiveAlertChildIdKey, null)
+        if (activeFamilyId != familyId || activeChildId != childId) return
+
+        upsertAlertZone(cityId, familyId, childId, zone)
+    }
+
+    fun removeAlertZone(cityId: String, familyId: String, childId: String?, areaId: String) {
+        val current = getAlertZones(cityId, familyId, childId) ?: return
+        saveAlertZones(
+            cityId = cityId,
+            familyId = familyId,
+            childId = childId,
+            zones = current.copy(
+                zones = current.zones.filterNot { it.id == areaId }
+            )
+        )
+    }
+
+    fun removeActiveAlertZone(areaId: String) {
+        val cityId = prefs.getString(ActiveAlertCityIdKey, null) ?: return
+        val familyId = prefs.getString(ActiveAlertFamilyIdKey, null) ?: return
+        val childId = prefs.getString(ActiveAlertChildIdKey, null)
+        removeAlertZone(cityId, familyId, childId, areaId)
+    }
+
     private fun getAlertZonesFile(cityId: String, familyId: String, childId: String?): java.io.File {
         val fileName = "alert_zones_${cityId}_${familyId}_${childId ?: "all"}.json"
         return java.io.File(context.filesDir, fileName)
@@ -135,6 +176,16 @@ class MapCacheLocalDataSource @Inject constructor(
         return "alert_zones_${cityId}_${familyId}_${childId ?: "all"}"
     }
 
+    fun clearData() {
+        prefs.edit().clear().apply()
+        try {
+            val files = context.filesDir.listFiles { _, name ->
+                name.startsWith("alert_zones_") && name.endsWith(".json")
+            }
+            files?.forEach { it.delete() }
+        } catch (_: Exception) {}
+    }
+
     private companion object {
         const val CitiesKey = "cities"
         const val ActiveAlertCityIdKey = "active_alert_city_id"
@@ -142,3 +193,4 @@ class MapCacheLocalDataSource @Inject constructor(
         const val ActiveAlertChildIdKey = "active_alert_child_id"
     }
 }
+

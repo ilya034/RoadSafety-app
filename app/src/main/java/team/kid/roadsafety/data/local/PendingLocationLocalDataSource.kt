@@ -68,9 +68,15 @@ class PendingLocationLocalDataSource @Inject constructor(
         }
     }
 
+    @Synchronized
+    fun clearData() {
+        prefs.edit().clear().apply()
+    }
+
     private companion object {
         const val QueueKey = "queue"
         const val MaxLocations = 5_760
         val MaxAge: Duration = Duration.ofHours(24)
     }
 }
+

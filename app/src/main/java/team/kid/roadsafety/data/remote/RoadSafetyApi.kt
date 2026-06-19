@@ -18,6 +18,7 @@ import team.kid.roadsafety.data.dto.CreateCustomUserMapAreaRequestDto
 import team.kid.roadsafety.data.dto.CreateFamilyRequestDto
 import team.kid.roadsafety.data.dto.CreateFamilyResponseDto
 import team.kid.roadsafety.data.dto.CreateInviteCodeRequestDto
+import team.kid.roadsafety.data.dto.FamilyResponseDto
 import team.kid.roadsafety.data.dto.GetFamilyMembersResponseDto
 import team.kid.roadsafety.data.dto.InviteCodeResponseDto
 import team.kid.roadsafety.data.dto.JoinFamilyByInviteCodeRequestDto
@@ -71,6 +72,9 @@ interface RoadSafetyApi {
 
     @GET("families/{familyId}/members")
     suspend fun getFamilyMembers(@Path("familyId") familyId: String): Response<GetFamilyMembersResponseDto>
+
+    @GET("families/{familyId}")
+    suspend fun getFamily(@Path("familyId") familyId: String): Response<FamilyResponseDto>
 
     @POST("families/invite-code")
     suspend fun createInviteCode(@Body request: CreateInviteCodeRequestDto): Response<InviteCodeResponseDto>

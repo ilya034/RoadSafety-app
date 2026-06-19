@@ -14,10 +14,15 @@ import team.kid.roadsafety.domain.aggregates.user.UserRole
 import team.kid.roadsafety.infrastructure.push.PushTokenSynchronizer
 import javax.inject.Inject
 
+import team.kid.roadsafety.domain.aggregates.map.MapRepository
+import team.kid.roadsafety.domain.aggregates.tracking.TrackingRepository
+
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val familyRepository: team.kid.roadsafety.domain.aggregates.family.FamilyRepository,
+    private val mapRepository: MapRepository,
+    private val trackingRepository: TrackingRepository,
     private val pushTokenSynchronizer: PushTokenSynchronizer
 ) : ViewModel() {
 
@@ -95,6 +100,8 @@ class MainViewModel @Inject constructor(
             stopLocationService(context)
             authRepository.logout()
             familyRepository.clearData()
+            mapRepository.clearData()
+            trackingRepository.clearData()
             _authState.value = AuthState.Unauthenticated
             _isChild.value = false
         }
