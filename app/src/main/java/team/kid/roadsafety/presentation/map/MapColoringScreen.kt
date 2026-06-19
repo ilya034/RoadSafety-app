@@ -45,6 +45,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -231,26 +232,21 @@ fun MapColoringScreen(
         state.mapStyleJson?.let { BaseStyle.Json(it) } ?: BaseStyle.Uri(MapBaseStyleUrl)
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
-        MaplibreMap(
-            modifier = Modifier.fillMaxSize(),
-            baseStyle = baseStyle,
-            cameraState = cameraState,
-            onMapClick = { position, _ ->
-                if (state.isCreatingCustomArea && state.canEditMap) {
-                    viewModel.onMapPointClicked(
-                        GeoPoint(
-                            latitude = position.latitude,
-                            longitude = position.longitude
-                        )
-                    )
-                    ClickResult.Consume
-                } else {
-                    ClickResult.Pass
-                }
-            }
-        ) {
-             state.tileUrl?.let { tileUrl ->
+    val currentTileUrl by rememberUpdatedState(state.tileUrl)
+    val currentOverrides by rememberUpdatedState(state.overrides)
+    val currentIsEraseMode by rememberUpdatedState(state.isEraseMode)
+    val currentDraftRisk by rememberUpdatedState(state.draftRisk)
+
+    val currentCustomAreasSource by rememberUpdatedState(customAreasSource)
+    val currentDraftFillSource by rememberUpdatedState(draftFillSource)
+    val currentDraftLineSource by rememberUpdatedState(draftLineSource)
+    val currentDraftPointsSource by rememberUpdatedState(draftPointsSource)
+    val currentCurrentLocationSource by rememberUpdatedState(currentLocationSource)
+    val currentChildLocationSource by rememberUpdatedState(childLocationSource)
+
+    val mapContent = remember {
+        @Composable {
+            currentTileUrl?.let { tileUrl ->
                 key(tileUrl) {
                     val tileList = remember(tileUrl) { listOf(tileUrl) }
                     val tileOptions = remember { TileSetOptions(minZoom = 9, maxZoom = 18) }
@@ -265,7 +261,7 @@ fun MapColoringScreen(
                         sourceLayer = "safety_zones",
                         minZoom = 9f,
                         maxZoom = 18f,
-                        color = safetyZoneColorExpression(state.overrides),
+                        color = safetyZoneColorExpression(currentOverrides),
                         opacity = const(0.35f),
                         onClick = { clickedFeatures ->
                             val baseAreaKey = clickedFeatures
@@ -286,8 +282,8 @@ fun MapColoringScreen(
                 }
             }
 
-            val customGeoJsonData = remember(customAreasSource) {
-                customAreasSource.toSafeGeoJsonData()
+            val customGeoJsonData = remember(currentCustomAreasSource) {
+                currentCustomAreasSource.toSafeGeoJsonData()
             }
             val customGeoJsonSource = rememberGeoJsonSource(
                 data = customGeoJsonData
@@ -306,7 +302,7 @@ fun MapColoringScreen(
                         ?.jsonPrimitive
                         ?.contentOrNull
 
-                    if (areaId != null && state.isEraseMode) {
+                    if (areaId != null && currentIsEraseMode) {
                         viewModel.onCustomAreaClicked(areaId)
                         ClickResult.Consume
                     } else {
@@ -315,8 +311,8 @@ fun MapColoringScreen(
                 }
             )
 
-            val draftGeoJsonData = remember(draftFillSource) {
-                draftFillSource.toSafeGeoJsonData()
+            val draftGeoJsonData = remember(currentDraftFillSource) {
+                currentDraftFillSource.toSafeGeoJsonData()
             }
             val draftGeoJsonSource = rememberGeoJsonSource(
                 data = draftGeoJsonData
@@ -324,13 +320,13 @@ fun MapColoringScreen(
             FillLayer(
                 id = "draft-custom-zone-fill",
                 source = draftGeoJsonSource,
-                color = const(state.draftRisk.toComposeColor()),
+                color = const(currentDraftRisk.toComposeColor()),
                 opacity = const(0.28f),
-                outlineColor = const(state.draftRisk.toComposeColor())
+                outlineColor = const(currentDraftRisk.toComposeColor())
             )
 
-            val draftLineGeoJsonData = remember(draftLineSource) {
-                draftLineSource.toSafeGeoJsonData()
+            val draftLineGeoJsonData = remember(currentDraftLineSource) {
+                currentDraftLineSource.toSafeGeoJsonData()
             }
             val draftLineGeoJsonSource = rememberGeoJsonSource(
                 data = draftLineGeoJsonData
@@ -338,12 +334,12 @@ fun MapColoringScreen(
             LineLayer(
                 id = "draft-custom-zone-line",
                 source = draftLineGeoJsonSource,
-                color = const(state.draftRisk.toComposeColor()),
+                color = const(currentDraftRisk.toComposeColor()),
                 width = const(3.dp)
             )
 
-            val draftPointGeoJsonData = remember(draftPointsSource) {
-                draftPointsSource.toSafeGeoJsonData()
+            val draftPointGeoJsonData = remember(currentDraftPointsSource) {
+                currentDraftPointsSource.toSafeGeoJsonData()
             }
             val draftPointGeoJsonSource = rememberGeoJsonSource(
                 data = draftPointGeoJsonData
@@ -353,12 +349,12 @@ fun MapColoringScreen(
                 source = draftPointGeoJsonSource,
                 color = const(Color.White),
                 radius = const(5.dp),
-                strokeColor = const(state.draftRisk.toComposeColor()),
+                strokeColor = const(currentDraftRisk.toComposeColor()),
                 strokeWidth = const(2.dp)
             )
 
-            val locationGeoJsonData = remember(currentLocationSource) {
-                currentLocationSource.toSafeGeoJsonData()
+            val locationGeoJsonData = remember(currentCurrentLocationSource) {
+                currentCurrentLocationSource.toSafeGeoJsonData()
             }
             val locationGeoJsonSource = rememberGeoJsonSource(
                 data = locationGeoJsonData
@@ -372,8 +368,8 @@ fun MapColoringScreen(
                 strokeWidth = const(2.dp)
             )
 
-            val childrenGeoJsonData = remember(childLocationSource) {
-                childLocationSource.toSafeGeoJsonData()
+            val childrenGeoJsonData = remember(currentChildLocationSource) {
+                currentChildLocationSource.toSafeGeoJsonData()
             }
             val childrenGeoJsonSource = rememberGeoJsonSource(
                 data = childrenGeoJsonData
@@ -387,6 +383,28 @@ fun MapColoringScreen(
                 strokeWidth = const(2.dp)
             )
         }
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        MaplibreMap(
+            modifier = Modifier.fillMaxSize(),
+            baseStyle = baseStyle,
+            cameraState = cameraState,
+            onMapClick = { position, _ ->
+                if (state.isCreatingCustomArea && state.canEditMap) {
+                    viewModel.onMapPointClicked(
+                        GeoPoint(
+                            latitude = position.latitude,
+                            longitude = position.longitude
+                        )
+                    )
+                    ClickResult.Consume
+                } else {
+                    ClickResult.Pass
+                }
+            },
+            content = mapContent
+        )
 
         if (state.canEditMap) {
             ZoneTargetDropdown(
