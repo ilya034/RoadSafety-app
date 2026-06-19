@@ -276,7 +276,13 @@ class MapRepositoryImpl @Inject constructor(
             }
         )
     }
+
+    override fun clearData() {
+        cache.clearData()
+    }
 }
+
+
 
 internal fun buildPolygonGeometry(points: List<GeoPoint>): team.kid.roadsafety.data.dto.GeoJsonGeometryDto {
     val closedRing = if (points.firstOrNull() == points.lastOrNull()) {

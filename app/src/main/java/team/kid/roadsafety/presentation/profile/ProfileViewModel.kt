@@ -11,10 +11,12 @@ import team.kid.roadsafety.data.dto.UserResponseDto
 import team.kid.roadsafety.domain.FamilyId
 import team.kid.roadsafety.domain.aggregates.family.FamilyMemberEntity
 import team.kid.roadsafety.domain.aggregates.family.FamilyRepository
+import team.kid.roadsafety.domain.aggregates.map.MapCity
 import team.kid.roadsafety.domain.aggregates.user.AuthRepository
 import team.kid.roadsafety.domain.aggregates.user.UserRole
 import java.util.UUID
 import javax.inject.Inject
+import kotlinx.coroutines.coroutineScope
 
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
@@ -26,7 +28,7 @@ class ProfileViewModel @Inject constructor(
     val uiState = _uiState.asStateFlow()
 
     init {
-        loadProfile()
+        // Removed loadProfile() to avoid double loading with LaunchedEffect in Screen
     }
 
     fun loadProfile() {
@@ -64,18 +66,56 @@ class ProfileViewModel @Inject constructor(
     }
 
     private suspend fun loadFamily(familyId: FamilyId) {
-        val membersResult = familyRepository.getFamilyMembers(familyId)
-        membersResult.onSuccess { members ->
-            _uiState.update { it.copy(members = members, isLoading = false) }
-        }.onFailure { error ->
-            _uiState.update { it.copy(isLoading = false, error = error.message) }
+        try {
+            val citiesResult = familyRepository.getSupportedCities()
+            val cities = citiesResult.getOrNull().orEmpty()
+            _uiState.update { it.copy(supportedCities = cities) }
+
+            coroutineScope {
+                launch {
+                    familyRepository.getFamily(familyId).onSuccess { family ->
+                        val city = cities.firstOrNull { it.cityId == family.cityId }
+                        val cityName = city?.name ?: family.cityId
+                        _uiState.update { it.copy(cityName = cityName, familyId = familyId) }
+                    }
+                }
+
+                launch {
+                    familyRepository.getFamilyMembers(familyId).onSuccess { members ->
+                        _uiState.update { it.copy(members = members) }
+                    }.onFailure { error ->
+                        _uiState.update { it.copy(error = error.message) }
+                    }
+                }
+            }
+        } finally {
+            _uiState.update { it.copy(isLoading = false) }
+        }
+    }
+
+    fun updateFamilyCity(cityId: String) {
+        val familyId = _uiState.value.familyId ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            familyRepository.updateFamilyCity(familyId, cityId)
+                .onSuccess {
+                    val cityName = _uiState.value.supportedCities
+                        .firstOrNull { it.cityId == cityId }?.name ?: cityId
+                    _uiState.update { it.copy(isLoading = false, cityName = cityName) }
+                }
+                .onFailure { error ->
+                    _uiState.update { it.copy(isLoading = false, error = error.message) }
+                }
         }
     }
 }
 
 data class ProfileUiState(
     val user: UserResponseDto? = null,
+    val familyId: FamilyId? = null,
     val members: List<FamilyMemberEntity> = emptyList(),
+    val cityName: String? = null,
+    val supportedCities: List<MapCity> = emptyList(),
     val inviteCode: String? = null,
     val isLoading: Boolean = false,
     val error: String? = null

@@ -7,6 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import team.kid.roadsafety.domain.aggregates.map.GeoPoint
 import team.kid.roadsafety.domain.aggregates.map.MapAreaColor
+import team.kid.roadsafety.domain.aggregates.map.MapCity
 
 class MapUiStateTest {
     @Test
@@ -131,6 +132,18 @@ class MapUiStateTest {
 
         assertEquals("salekhard", viewedCityState.activeMapCityId)
         assertFalse(viewedCityState.isLoading)
+    }
+
+    @Test
+    fun cameraCityTrackingWaitsForInitializedCamera() {
+        val state = MapUiState(
+            activeMapCityId = "salekhard",
+            familyCityId = "salekhard",
+            cities = listOf(MapCity(cityId = "ekb", name = "Екатеринбург"))
+        )
+
+        assertFalse(state.canTrackCameraCity)
+        assertTrue(state.copy(isCameraInitialized = true).canTrackCameraCity)
     }
 
     @Test

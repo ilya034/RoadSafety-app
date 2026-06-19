@@ -65,13 +65,12 @@ class FamilyOnboardingViewModel @Inject constructor(
                             ?: _uiState.value.selectedCity?.let { current ->
                                 loadedCities.firstOrNull { it.cityId == current.cityId }
                             }
-                            ?: loadedCities.first()
 
                         _uiState.update {
                             it.copy(
                                 cities = loadedCities,
                                 selectedCity = selectedCity,
-                                cityQuery = selectedCity.name
+                                cityQuery = selectedCity?.name ?: it.cityQuery
                             )
                         }
                     },
@@ -79,8 +78,8 @@ class FamilyOnboardingViewModel @Inject constructor(
                         _uiState.update { state ->
                             state.copy(
                                 cities = listOf(FallbackCity),
-                                selectedCity = state.selectedCity ?: FallbackCity,
-                                cityQuery = state.selectedCity?.name ?: FallbackCity.name
+                                selectedCity = state.selectedCity,
+                                cityQuery = state.selectedCity?.name ?: state.cityQuery
                             )
                         }
                     }
@@ -131,9 +130,9 @@ data class FamilyOnboardingUiState(
     val familyName: String = "",
     val inviteCode: String = "",
     val userRole: UserRole = UserRole.CHILD,
-    val cities: List<MapCity> = listOf(FallbackCity),
-    val selectedCity: MapCity? = FallbackCity,
-    val cityQuery: String = FallbackCity.name,
+    val cities: List<MapCity> = emptyList(),
+    val selectedCity: MapCity? = null,
+    val cityQuery: String = "",
     val isLoading: Boolean = false,
     val error: String? = null
 )

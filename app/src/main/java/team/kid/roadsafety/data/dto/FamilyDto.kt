@@ -54,3 +54,11 @@ data class MemberDto(
     val displayName: String = "",
     val login: String = ""
 )
+
+@Serializable
+data class FamilyResponseDto(
+    val id: String,
+    val name: String? = null,
+    val createdByUserId: String,
+    val cityId: String
+)

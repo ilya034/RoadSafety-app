@@ -125,4 +125,9 @@ class TrackingRepositoryImpl @Inject constructor(
     } catch (e: Exception) {
         Result.failure(e)
     }
+
+    override fun clearData() {
+        pendingLocationLocalDataSource.clearData()
+    }
 }
+

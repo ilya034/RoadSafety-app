@@ -16,4 +16,6 @@ interface MapRepository {
     suspend fun resetBaseAreaColor(baseAreaKey: String, familyId: String, childId: UserId? = null): Result<Unit>
     suspend fun createCustomArea(familyId: String, childId: UserId?, risk: MapAreaColor, points: List<GeoPoint>): Result<MapArea>
     suspend fun deleteCustomArea(areaId: AreaId): Result<Unit>
+    fun clearData()
 }
+

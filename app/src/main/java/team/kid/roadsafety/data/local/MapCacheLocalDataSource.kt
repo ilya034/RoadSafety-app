@@ -176,6 +176,16 @@ class MapCacheLocalDataSource @Inject constructor(
         return "alert_zones_${cityId}_${familyId}_${childId ?: "all"}"
     }
 
+    fun clearData() {
+        prefs.edit().clear().apply()
+        try {
+            val files = context.filesDir.listFiles { _, name ->
+                name.startsWith("alert_zones_") && name.endsWith(".json")
+            }
+            files?.forEach { it.delete() }
+        } catch (_: Exception) {}
+    }
+
     private companion object {
         const val CitiesKey = "cities"
         const val ActiveAlertCityIdKey = "active_alert_city_id"
@@ -183,3 +193,4 @@ class MapCacheLocalDataSource @Inject constructor(
         const val ActiveAlertChildIdKey = "active_alert_child_id"
     }
 }
+

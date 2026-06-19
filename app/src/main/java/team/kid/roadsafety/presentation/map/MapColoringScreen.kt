@@ -130,7 +130,9 @@ fun MapColoringScreen(
         }
     }
 
-    LaunchedEffect(cameraState) {
+    LaunchedEffect(cameraState, state.canTrackCameraCity) {
+        if (!state.canTrackCameraCity) return@LaunchedEffect
+
         snapshotFlow {
             val target = cameraState.position.target
             GeoPoint(latitude = target.latitude, longitude = target.longitude)
@@ -142,7 +144,9 @@ fun MapColoringScreen(
             }
     }
 
-    LaunchedEffect(cameraState) {
+    LaunchedEffect(cameraState, state.isCameraInitialized) {
+        if (!state.isCameraInitialized) return@LaunchedEffect
+
         snapshotFlow { cameraState.position }
             .distinctUntilChanged()
             .collectLatest { position ->
@@ -219,6 +223,7 @@ fun MapColoringScreen(
                 target = bbox.centerPosition(),
                 zoom = bbox.defaultZoom()
             )
+            viewModel.markCameraInitialized()
         }
     }
 
