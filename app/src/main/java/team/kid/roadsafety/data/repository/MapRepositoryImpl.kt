@@ -29,12 +29,6 @@ class MapRepositoryImpl @Inject constructor(
             ?.map { it.toMapArea() }
     }
 
-    override fun getCachedAlertZones(cityId: String, familyId: String, childId: UserId?): List<AlertZone>? {
-        return cache.getAlertZones(cityId, familyId, childId?.value?.toString())
-            ?.zones
-            ?.map { it.toAlertZone() }
-    }
-
     override fun getActiveCachedAlertZones(): List<AlertZone> {
         return cache.getActiveAlertZones()?.zones?.map { it.toAlertZone() } ?: emptyList()
     }
@@ -100,12 +94,6 @@ class MapRepositoryImpl @Inject constructor(
             if (e is CancellationException) throw e
             cachedCityMetadata(cityId) ?: Result.failure(e)
         }
-    }
-
-    override suspend fun updateAreaColor(area: MapArea, familyId: String, color: MapAreaColor, childId: UserId?): Result<Unit> {
-        val baseAreaKey = area.baseAreaKey
-            ?: return Result.failure(Exception("Cannot override color for an area without baseAreaKey"))
-        return updateBaseAreaColor(baseAreaKey, familyId, color, childId)
     }
 
     override suspend fun updateBaseAreaColor(baseAreaKey: String, familyId: String, color: MapAreaColor, childId: UserId?): Result<Unit> = withContext(Dispatchers.IO) {

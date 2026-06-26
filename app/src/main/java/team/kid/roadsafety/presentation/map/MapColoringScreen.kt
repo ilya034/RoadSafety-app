@@ -228,9 +228,7 @@ fun MapColoringScreen(
         }
     }
 
-    val baseStyle = remember(state.mapStyleJson) {
-        state.mapStyleJson?.let { BaseStyle.Json(it) } ?: BaseStyle.Uri(MapBaseStyleUrl)
-    }
+    val baseStyle = remember { BaseStyle.Uri(MapBaseStyleUrl) }
 
     val currentTileUrl by rememberUpdatedState(state.tileUrl)
     val currentOverrides by rememberUpdatedState(state.overrides)
@@ -728,13 +726,8 @@ fun PaintPanel(
                         .clickable {
                             if (isSelected) onColorSelected(null)
                             else onColorSelected(domainColor)
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (domainColor == MapAreaColor.NONE) {
-                        Text("X", color = Color.White, style = MaterialTheme.typography.bodyLarge)
-                    }
-                }
+                        }
+                )
             }
 
             HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))

@@ -167,13 +167,7 @@ class MapViewModel @Inject constructor(
     }
 
     private suspend fun loadCity(cityId: String, familyId: String?) {
-        val styleJob = viewModelScope.launch {
-            val styleJson = mapTileCacheService.getStyleJsonForCity(cityId)
-            _uiState.update { it.copy(mapStyleJson = styleJson) }
-        }
-
         loadCachedCity(cityId, familyId)
-        styleJob.join()
 
         val isOnline = networkMonitor.isOnline()
         _uiState.update { it.copy(isOnline = isOnline) }
@@ -619,17 +613,6 @@ class MapViewModel @Inject constructor(
         viewCity(city.cityId)
     }
 
-    fun dismissAreaSelection() {
-        _uiState.update {
-            it.copy(
-                activePaintColor = null,
-                isEraseMode = false,
-                isCreatingCustomArea = false,
-                draftPoints = emptyList()
-            )
-        }
-    }
-
     fun onZoneTargetSelected(targetId: String) {
         val state = _uiState.value
         if (!state.canEditMap || targetId == state.selectedZoneTarget.id) return
@@ -872,7 +855,6 @@ data class MapUiState(
     val isParent: Boolean = false,
     val metadata: MapCityMetadata? = null,
     val tileUrl: String? = null,
-    val mapStyleJson: String? = null,
     val overrides: Map<String, MapAreaColor> = emptyMap(),
     val customAreas: List<MapArea> = emptyList(),
     val zoneTargets: List<ZoneTarget> = listOf(ZoneTarget.AllFamily),
@@ -906,9 +888,6 @@ data class MapUiState(
 
     val canSaveCustomArea: Boolean
         get() = canEditMap && isOnline && !isSavingCustomArea && draftPoints.distinct().size >= 3
-
-    val canEraseAreas: Boolean
-        get() = canEditMap
 
     val canTrackCameraCity: Boolean
         get() = isCameraInitialized && cities.isNotEmpty()

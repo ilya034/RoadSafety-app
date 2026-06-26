@@ -147,21 +147,6 @@ class MapUiStateTest {
     }
 
     @Test
-    fun eraseModeIsAvailableOnlyWhenMapCanBeEdited() {
-        val editableState = MapUiState(
-            activeMapCityId = "ekb",
-            familyCityId = "ekb",
-            familyId = "family",
-            isParent = true
-        )
-
-        assertTrue(editableState.canEraseAreas)
-        assertFalse(editableState.copy(activeMapCityId = "salekhard").canEraseAreas)
-        assertFalse(editableState.copy(familyId = null).canEraseAreas)
-        assertFalse(editableState.copy(isParent = false).canEraseAreas)
-    }
-
-    @Test
     fun colorSelectionAndCustomDraftStateClearEraseMode() {
         val eraseState = MapUiState(
             activeMapCityId = "ekb",
